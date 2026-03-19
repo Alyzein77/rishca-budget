@@ -488,8 +488,11 @@ function App(){
       }).map(function(e,i){
         var d=new Date(e.logged_at||e.started_at);
         var hrs=Math.round(e.duration_minutes/60*100)/100;
-        var nm=e.user&&e.user.name||e.user&&e.user.email||"Unknown";
-        var mem=team.find(function(t){return t.name===nm;});
+        var rawName=e.user&&e.user.name||e.user&&e.user.email||"Unknown";
+        // Name normalization: map Vitalis names to budget system names
+        var nameMap={"Aml Hamdy":"Amal Hamdy","Aml":"Amal Hamdy","aml hamdy":"Amal Hamdy","Amal":"Amal Hamdy"};
+        var nm=nameMap[rawName]||rawName;
+        var mem=team.find(function(t){return t.name===nm||t.name.toLowerCase()===nm.toLowerCase();});
         var rate=mem?mem.rate:0;
         return {id:10000+i,y:d.getFullYear(),m:d.getMonth()+1,mn:MN[d.getMonth()+1],
           name:nm,type:mem?mem.type[0]:"H",rate:rate,hrs:hrs,
