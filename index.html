@@ -512,7 +512,7 @@ function App(){
             h("button",{onClick:syncVitalis,
               className:"bg-teal-700 hover:bg-teal-600 px-4 py-2 rounded-lg text-sm font-medium transition"},
               "⟳ Sync Vitalis"),
-            syncMsg[0] && h("span",{className:"text-xs text-teal-300"},syncMsg[0]),
+            syncMsg[0] && h("span",{className:"text-xs "+(syncMsg[0].indexOf("Error")>=0||syncMsg[0].indexOf("Failed")>=0?"text-red-400":"text-teal-300"),style:{maxWidth:"300px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",display:"inline-block"}},syncMsg[0].length>80?syncMsg[0].substring(0,80)+"...":syncMsg[0]),
             h("button",{onClick:function(){logged[1](false);tab[1]("dashboard");},
               className:"bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg text-sm transition"},"Logout")
           )
