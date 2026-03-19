@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rishca OS Budget Dashboard</title>
-    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/react.production.min.js"></script>
-    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/react-dom.production.min.js"></script>
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.development.js"></script>
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.development.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -980,8 +980,15 @@
         // ============================================================
         // APPLICATION INITIALIZATION
         // ============================================================
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(h(App));
+        try {
+            const root = ReactDOM.createRoot(document.getElementById('root'));
+            root.render(h(App));
+        } catch(e) {
+            document.getElementById('root').innerHTML = '<div style="padding:40px;color:red;font-family:monospace;"><h2>Init Error</h2><pre>' + e.message + '\n' + e.stack + '</pre></div>';
+        }
+        window.onerror = function(msg, url, line, col, err) {
+            document.getElementById('root').innerHTML += '<div style="padding:20px;color:red;font-family:monospace;border-top:2px solid red;margin-top:20px;"><h3>Runtime Error</h3><pre>' + msg + '\nLine: ' + line + '\n' + (err ? err.stack : '') + '</pre></div>';
+        };
 
         // ============================================================
         // RISHCA OS BUDGET DASHBOARD - END OF APPLICATION
