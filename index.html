@@ -136,12 +136,32 @@ function getWorkingDays(year,month){
   return count;
 }
 
-// Required hours for a month: working_days × 7 hrs/day
-function getRequiredHours(year,month,empType){
+// Hour overrides: "YYYY-MM|Fulltime" → custom hours, "YYYY-MM|Part-time" → custom hours
+// This gets populated from App state. Functions read from this global ref.
+var _hourOverrides={};
+
+// Required hours for a month: check per-person override, then type override, then calculate
+function getRequiredHours(year,month,empType,personName){
+  var mKey=year+"-"+String(month).padStart(2,"0");
+  // Per-person override (highest priority)
+  if(personName){
+    var pKey=mKey+"|"+personName;
+    if(_hourOverrides[pKey]!==undefined&&_hourOverrides[pKey]!=="")return parseFloat(_hourOverrides[pKey]);
+  }
+  // Per-type override
+  var tKey=mKey+"|"+empType;
+  if(_hourOverrides[tKey]!==undefined&&_hourOverrides[tKey]!=="")return parseFloat(_hourOverrides[tKey]);
   var wd=getWorkingDays(year,month);
   if(empType==="Fulltime")return wd*7;
-  if(empType==="Part-time")return wd*3.5; // half day
-  return 0; // hourly workers have no required hours
+  if(empType==="Part-time")return wd*3.5;
+  return 0;
+}
+
+function getDefaultRequiredHours(year,month,empType){
+  var wd=getWorkingDays(year,month);
+  if(empType==="Fulltime")return wd*7;
+  if(empType==="Part-time")return wd*3.5;
+  return 0;
 }
 
 // ── HOURLY RATE HISTORY (per person per month) ────────────────
@@ -168,7 +188,7 @@ function getRate(name,year,month){
 function calcSalaryPay(name,year,month,hoursLogged,isException){
   var mem=team.find(function(t){return t.name===name;});
   if(!mem||!mem.salary)return {base:0,deduction:0,overtime:0,total:0,required:0,diff:0};
-  var required=getRequiredHours(year,month,mem.type);
+  var required=getRequiredHours(year,month,mem.type,name);
   var rate=getRate(name,year,month)||0;
   // For salaried with no explicit hourly rate, derive from salary/required_hours
   if(rate===0&&required>0)rate=mem.salary/required;
@@ -597,30 +617,84 @@ function RatesTab(props){
 
 // ── WORKING HOURS TARGET TAB ──────────────────────────────────
 function HoursTab(props){
-  var data=props.data;
+  var data=props.data,ho=props.hourOvr,setHO=props.setHourOvr;
   var months=["2025-03","2025-04","2025-05","2025-06","2025-07","2025-08","2025-09","2025-10","2025-11","2025-12","2026-01","2026-02","2026-03"];
-  // Only salaried employees have targets
   var salaried=team.filter(function(t){return t.salary>0;});
+
+  function setOverride(mKey,empType,val){
+    var key=mKey+"|"+empType;
+    var next=Object.assign({},ho);
+    if(val===""||val===null){delete next[key];}
+    else{next[key]=parseFloat(val);}
+    setHO(next);
+  }
+  function getOvr(mKey,empType){
+    var key=mKey+"|"+empType;
+    return ho[key]!==undefined?ho[key]:"";
+  }
 
   return h("div",{className:"fade-in"},
     h("h2",{className:"text-xl font-bold text-slate-900 mb-2"},"Working Hours Target vs Actual"),
-    h("p",{className:"text-sm text-slate-500 mb-4"},"Based on Egyptian working days (Sun-Thu), public holidays, and 7 hrs/day. Part-time = 3.5 hrs/day."),
+    h("p",{className:"text-sm text-slate-500 mb-4"},"Click any target hours cell to override. Clear to reset to auto-calculated value. Based on Egyptian working days (Sun-Thu) × 7 hrs/day."),
 
-    // Working days summary
-    h("div",{className:"bg-white rounded-xl shadow border border-slate-200 p-5 mb-6"},
-      h("h3",{className:"font-bold text-slate-900 mb-3"},"Working Days per Month"),
-      h("div",{className:"flex flex-wrap gap-3"},
-        months.map(function(mKey){
-          var parts=mKey.split("-");
-          var y=parseInt(parts[0]),m=parseInt(parts[1]);
-          var wd=getWorkingDays(y,m);
-          return h("div",{key:mKey,className:"bg-slate-50 rounded-lg px-4 py-2 text-center border border-slate-200"},
-            h("div",{className:"text-xs text-slate-500"},MN[m]+" "+String(y).slice(2)),
-            h("div",{className:"text-lg font-bold text-slate-900"},wd),
-            h("div",{className:"text-xs text-slate-400"},wd*7+"h FT")
-          );
-        })
-      )
+    // Working days + editable target hours summary
+    h("div",{className:"bg-white rounded-xl shadow border border-slate-200 p-5 mb-6 overflow-x-auto"},
+      h("h3",{className:"font-bold text-slate-900 mb-3"},"Working Days & Target Hours per Month"),
+      h("table",{className:"w-full text-sm"},
+        h("thead",null,h("tr",{className:"bg-slate-50 border-b border-slate-200"},
+          h("th",{className:"px-3 py-2 text-left"},""),
+          months.map(function(mKey){
+            var parts=mKey.split("-");
+            return h("th",{key:mKey,className:"px-3 py-2 text-center min-w-[85px]"},MN[parseInt(parts[1])]+" "+parts[0].slice(2));
+          })
+        )),
+        h("tbody",null,
+          h("tr",{className:"border-b border-slate-100"},
+            h("td",{className:"px-3 py-2 font-medium text-slate-600"},"Working Days"),
+            months.map(function(mKey){
+              var parts=mKey.split("-");
+              return h("td",{key:mKey,className:"px-3 py-2 text-center font-bold text-slate-900"},getWorkingDays(parseInt(parts[0]),parseInt(parts[1])));
+            })
+          ),
+          h("tr",{className:"border-b border-slate-100"},
+            h("td",{className:"px-3 py-2 font-medium text-slate-600"},"FT Target (hrs)"),
+            months.map(function(mKey){
+              var parts=mKey.split("-");
+              var def=getDefaultRequiredHours(parseInt(parts[0]),parseInt(parts[1]),"Fulltime");
+              var val=getOvr(mKey,"Fulltime");
+              return h("td",{key:mKey,className:"px-1 py-1 text-center"},
+                h("input",{type:"number",value:val===""?def:val,placeholder:def,
+                  onChange:function(e){
+                    var v=e.target.value;
+                    if(v===""||parseFloat(v)===def)setOverride(mKey,"Fulltime","");
+                    else setOverride(mKey,"Fulltime",v);
+                  },
+                  className:"w-full text-center border rounded px-1 py-1 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none "+(val!==""?"border-teal-400 bg-teal-50 text-teal-700 font-bold":"border-slate-200 text-slate-600")
+                })
+              );
+            })
+          ),
+          h("tr",null,
+            h("td",{className:"px-3 py-2 font-medium text-slate-600"},"PT Target (hrs)"),
+            months.map(function(mKey){
+              var parts=mKey.split("-");
+              var def=getDefaultRequiredHours(parseInt(parts[0]),parseInt(parts[1]),"Part-time");
+              var val=getOvr(mKey,"Part-time");
+              return h("td",{key:mKey,className:"px-1 py-1 text-center"},
+                h("input",{type:"number",value:val===""?def:val,placeholder:def,
+                  onChange:function(e){
+                    var v=e.target.value;
+                    if(v===""||parseFloat(v)===def)setOverride(mKey,"Part-time","");
+                    else setOverride(mKey,"Part-time",v);
+                  },
+                  className:"w-full text-center border rounded px-1 py-1 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none "+(val!==""?"border-teal-400 bg-teal-50 text-teal-700 font-bold":"border-slate-200 text-slate-600")
+                })
+              );
+            })
+          )
+        )
+      ),
+      h("p",{className:"text-xs text-slate-400 mt-2"},"Teal-highlighted cells have manual overrides. Clear the value to reset to auto-calculated.")
     ),
 
     // Per-person target vs actual
@@ -639,16 +713,32 @@ function HoursTab(props){
             })
           )),
           h("tbody",null,
-            // Required hours row
             h("tr",{className:"border-b border-slate-100"},
               h("td",{className:"px-3 py-2 font-medium text-slate-600"},"Required"),
               months.map(function(mKey){
                 var parts=mKey.split("-");
-                var req=getRequiredHours(parseInt(parts[0]),parseInt(parts[1]),emp.type);
-                return h("td",{key:mKey,className:"px-3 py-2 text-center text-slate-500"},req+"h");
+                var y=parseInt(parts[0]),m=parseInt(parts[1]);
+                var def=getDefaultRequiredHours(y,m,emp.type);
+                var ovrKey=mKey+"|"+emp.name;
+                var personalOvr=ho[ovrKey];
+                var typeOvr=ho[mKey+"|"+emp.type];
+                var current=personalOvr!==undefined?personalOvr:(typeOvr!==undefined?typeOvr:def);
+                var isOverridden=personalOvr!==undefined;
+                return h("td",{key:mKey,className:"px-1 py-1 text-center"},
+                  h("input",{type:"number",value:isOverridden?personalOvr:current,
+                    placeholder:def,
+                    onChange:function(e){
+                      var v=e.target.value;
+                      var next=Object.assign({},ho);
+                      if(v===""||parseFloat(v)===def){delete next[ovrKey];}
+                      else{next[ovrKey]=parseFloat(v);}
+                      setHO(next);
+                    },
+                    className:"w-full text-center border rounded px-1 py-1 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none "+(isOverridden?"border-teal-400 bg-teal-50 text-teal-700 font-bold":"border-slate-200 text-slate-500")
+                  })
+                );
               })
             ),
-            // Actual hours row
             h("tr",{className:"border-b border-slate-100"},
               h("td",{className:"px-3 py-2 font-medium text-slate-600"},"Logged"),
               months.map(function(mKey){
@@ -656,12 +746,11 @@ function HoursTab(props){
                 var y=parseInt(parts[0]),m=parseInt(parts[1]);
                 var logged=data.filter(function(e){return e.name===emp.name&&e.y===y&&e.m===m;})
                   .reduce(function(s,e){return s+e.hrs;},0);
-                var req=getRequiredHours(y,m,emp.type);
+                var req=getRequiredHours(y,m,emp.type,emp.name);
                 var color=logged>=req?"text-green-600":logged>0?"text-red-600":"text-slate-300";
                 return h("td",{key:mKey,className:"px-3 py-2 text-center font-semibold "+color},logged>0?logged.toFixed(1)+"h":"—");
               })
             ),
-            // Diff row
             h("tr",{className:"border-b border-slate-100"},
               h("td",{className:"px-3 py-2 font-medium text-slate-600"},"Diff"),
               months.map(function(mKey){
@@ -669,14 +758,13 @@ function HoursTab(props){
                 var y=parseInt(parts[0]),m=parseInt(parts[1]);
                 var logged=data.filter(function(e){return e.name===emp.name&&e.y===y&&e.m===m;})
                   .reduce(function(s,e){return s+e.hrs;},0);
-                var req=getRequiredHours(y,m,emp.type);
+                var req=getRequiredHours(y,m,emp.type,emp.name);
                 if(logged===0)return h("td",{key:mKey,className:"px-3 py-2 text-center text-slate-300"},"—");
                 var diff=logged-req;
                 var color=diff>=0?"text-green-600":"text-red-600";
                 return h("td",{key:mKey,className:"px-3 py-2 text-center font-bold "+color},(diff>=0?"+":"")+diff.toFixed(1)+"h");
               })
             ),
-            // Pay impact row
             h("tr",null,
               h("td",{className:"px-3 py-2 font-medium text-slate-600"},"Pay"),
               months.map(function(mKey){
@@ -722,13 +810,17 @@ function App(){
   var syncMsg=useState("");
   var rh=useState(saved&&saved.rateHistory?saved.rateHistory:Object.assign({},rateHistory));
   var exceptions=useState(saved&&saved.exceptions?saved.exceptions:{});
+  var hourOvr=useState(saved&&saved.hourOverrides?saved.hourOverrides:{});
   var lastSaved=useState(saved&&saved.savedAt?saved.savedAt:null);
 
-  // Auto-save whenever data, rates, or exceptions change
+  // Keep global _hourOverrides in sync so getRequiredHours() can read them
+  _hourOverrides=hourOvr[0];
+
+  // Auto-save whenever data, rates, exceptions, or hour overrides change
   useEffect(function(){
-    saveState({entries:data[0],rateHistory:rh[0],exceptions:exceptions[0],savedAt:new Date().toISOString()});
+    saveState({entries:data[0],rateHistory:rh[0],exceptions:exceptions[0],hourOverrides:hourOvr[0],savedAt:new Date().toISOString()});
     lastSaved[1](new Date().toLocaleTimeString());
-  },[data[0],rh[0],exceptions[0]]);
+  },[data[0],rh[0],exceptions[0],hourOvr[0]]);
 
   // Fetch live FX rate on load
   useEffect(function(){
@@ -807,7 +899,7 @@ function App(){
             h("button",{onClick:function(){
               if(confirm("Reset all data to defaults? This clears synced Vitalis entries, payment statuses, rate changes, and exceptions.")){
                 localStorage.removeItem(STORE_KEY);
-                data[1](entries);rh[1](Object.assign({},rateHistory));exceptions[1]({});
+                data[1](entries);rh[1](Object.assign({},rateHistory));exceptions[1]({});hourOvr[1]({});
                 syncMsg[1]("Data reset to defaults");setTimeout(function(){syncMsg[1]("");},3000);
               }
             },className:"bg-red-900 hover:bg-red-800 px-3 py-2 rounded-lg text-xs transition"},"Reset"),
@@ -829,7 +921,7 @@ function App(){
     h("div",{className:"max-w-7xl mx-auto px-4 py-6"},
       tab[0]==="dashboard" && h(DashTab,{data:data[0],fx:fx[0]}),
       tab[0]==="payments" && h(PayTab,{data:data[0],setData:data[1],fx:fx[0],exceptions:exceptions}),
-      tab[0]==="hours" && h(HoursTab,{data:data[0]}),
+      tab[0]==="hours" && h(HoursTab,{data:data[0],hourOvr:hourOvr[0],setHourOvr:hourOvr[1]}),
       tab[0]==="rates" && h(RatesTab,{rateHistory:rh[0],setRateHistory:rh[1]}),
       tab[0]==="time-log" && h(LogTab,{data:data[0],setData:data[1]}),
       tab[0]==="team" && h(TeamTab,{data:data[0]}),
