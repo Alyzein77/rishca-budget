@@ -1,1280 +1,948 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Rishca OS — Budget Manager</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/recharts/2.12.7/Recharts.min.js"></script>
-  <script src="https://unpkg.com/lucide-react@0.383.0/dist/umd/lucide-react.min.js"></script>
-  <style>
-    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
-    #root { min-height: 100vh; }
-  </style>
-</head>
-<body>
-  <div id="root"></div>
-  <script type="text/babel">
-    const { useState, useReducer, useEffect, useCallback } = React;
-    const {
-      LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
-      Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell
-    } = Recharts;
-    const {
-      LogOut, Plus, Edit2, Trash2, Save, X, ChevronDown,
-      Users, DollarSign, TrendingUp, Calendar, Lock, RefreshCw, Cloud
-    } = lucideReact;
-
-  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell
-} from 'recharts';
-  LogOut, Plus, Edit2, Trash2, Save, X, ChevronDown,
-  Users, DollarSign, TrendingUp, Calendar, Lock, RefreshCw, Cloud
-} from 'lucide-react';
-
-// Supabase/Vitalis-Layer API Configuration
-const VITALIS_API = {
-  url: "https://llrvrcgwhvcaqvscpnsi.supabase.co/functions/v1/team-time-log",
-  key: "TiQwbG47NLUKYhg",
-};
-
-// Name mapping: Supabase profile names → budget system names
-const VITALIS_NAME_MAP = {
-  "Aml Hamdy": "Amal Hamdy",
-  "Amal Hamdy": "Amal Hamdy",
-  "Anas Emad": "Anas Emad",
-  "Bahaa Mohamed": "Bahaa Mohamed",
-  "Amr Tarek": "Amr Tarek",
-  "Nada Amin": "Nada Amin",
-  "Yasseen Nouh": "Yasseen Nouh",
-  "Tarek Mohamed": "Tarek Mohamed",
-  "Alaa Ashraf": "Alaa Ashraf",
-};
-
-// Time entries data - all 73 entries
-const initialTimeEntries = [
-  { id: 1, year: 2025, month: 3, monthName: "Mar", name: "Rana El Sobky", type: "Hourly", rate: 150, hours: 18.25, amount: 2737.5, status: "Transferred" },
-  { id: 2, year: 2025, month: 3, monthName: "Mar", name: "Abaza", type: "Hourly", rate: 250, hours: 4.5, amount: 1125, status: "Transferred" },
-  { id: 3, year: 2025, month: 3, monthName: "Mar", name: "Alaa Ashraf", type: "Hourly", rate: 100, hours: 0, amount: 0, status: "Transferred" },
-  { id: 4, year: 2025, month: 3, monthName: "Mar", name: "Nada Amin", type: "Hourly", rate: 150, hours: 0, amount: 0, status: "Transferred" },
-  { id: 5, year: 2025, month: 3, monthName: "Mar", name: "Ahmed Hamdy", type: "Hourly", rate: 500, hours: 0, amount: 0, status: "Transferred" },
-  { id: 6, year: 2025, month: 3, monthName: "Mar", name: "Yasseen Nouh", type: "Hourly", rate: 350, hours: 3.25, amount: 1137.5, status: "Transferred" },
-  { id: 7, year: 2025, month: 3, monthName: "Mar", name: "Amr Tarek", type: "Hourly", rate: 350, hours: 0, amount: 0, status: "Transferred" },
-  { id: 8, year: 2025, month: 3, monthName: "Mar", name: "Tarek Mohamed", type: "Hourly", rate: 150, hours: 0, amount: 0, status: "Transferred" },
-  { id: 9, year: 2025, month: 4, monthName: "Apr", name: "Rana El Sobky", type: "Hourly", rate: 150, hours: 35, amount: 5250, status: "Transferred" },
-  { id: 10, year: 2025, month: 4, monthName: "Apr", name: "Abaza", type: "Hourly", rate: 250, hours: 8, amount: 2000, status: "Transferred" },
-  { id: 11, year: 2025, month: 4, monthName: "Apr", name: "Alaa Ashraf", type: "Hourly", rate: 100, hours: 20, amount: 2000, status: "Transferred" },
-  { id: 12, year: 2025, month: 4, monthName: "Apr", name: "Nada Amin", type: "Hourly", rate: 150, hours: 15, amount: 2250, status: "Transferred" },
-  { id: 13, year: 2025, month: 4, monthName: "Apr", name: "Ahmed Hamdy", type: "Hourly", rate: 500, hours: 5, amount: 2500, status: "Transferred" },
-  { id: 14, year: 2025, month: 4, monthName: "Apr", name: "Yasseen Nouh", type: "Hourly", rate: 350, hours: 12, amount: 4200, status: "Transferred" },
-  { id: 15, year: 2025, month: 4, monthName: "Apr", name: "Amr Tarek", type: "Hourly", rate: 350, hours: 10, amount: 3500, status: "Transferred" },
-  { id: 16, year: 2025, month: 4, monthName: "Apr", name: "Tarek Mohamed", type: "Hourly", rate: 150, hours: 8, amount: 1200, status: "Transferred" },
-  { id: 17, year: 2025, month: 5, monthName: "May", name: "Rana El Sobky", type: "Hourly", rate: 150, hours: 42, amount: 6300, status: "Transferred" },
-  { id: 18, year: 2025, month: 5, monthName: "May", name: "Abaza", type: "Hourly", rate: 250, hours: 12, amount: 3000, status: "Transferred" },
-  { id: 19, year: 2025, month: 5, monthName: "May", name: "Alaa Ashraf", type: "Hourly", rate: 100, hours: 25, amount: 2500, status: "Transferred" },
-  { id: 20, year: 2025, month: 5, monthName: "May", name: "Nada Amin", type: "Hourly", rate: 150, hours: 18, amount: 2700, status: "Transferred" },
-  { id: 21, year: 2025, month: 5, monthName: "May", name: "Ahmed Hamdy", type: "Hourly", rate: 500, hours: 8, amount: 4000, status: "Transferred" },
-  { id: 22, year: 2025, month: 5, monthName: "May", name: "Yasseen Nouh", type: "Hourly", rate: 350, hours: 15, amount: 5250, status: "Transferred" },
-  { id: 23, year: 2025, month: 5, monthName: "May", name: "Amr Tarek", type: "Hourly", rate: 350, hours: 14, amount: 4900, status: "Transferred" },
-  { id: 24, year: 2025, month: 5, monthName: "May", name: "Tarek Mohamed", type: "Hourly", rate: 150, hours: 10, amount: 1500, status: "Transferred" },
-  { id: 25, year: 2025, month: 6, monthName: "Jun", name: "Rana El Sobky", type: "Hourly", rate: 150, hours: 38, amount: 5700, status: "Transferred" },
-  { id: 26, year: 2025, month: 6, monthName: "Jun", name: "Abaza", type: "Hourly", rate: 250, hours: 10, amount: 2500, status: "Transferred" },
-  { id: 27, year: 2025, month: 6, monthName: "Jun", name: "Alaa Ashraf", type: "Hourly", rate: 100, hours: 28, amount: 2800, status: "Transferred" },
-  { id: 28, year: 2025, month: 6, monthName: "Jun", name: "Nada Amin", type: "Hourly", rate: 150, hours: 20, amount: 3000, status: "Transferred" },
-  { id: 29, year: 2025, month: 6, monthName: "Jun", name: "Ahmed Hamdy", type: "Hourly", rate: 500, hours: 6, amount: 3000, status: "Transferred" },
-  { id: 30, year: 2025, month: 6, monthName: "Jun", name: "Yasseen Nouh", type: "Hourly", rate: 350, hours: 16, amount: 5600, status: "Transferred" },
-  { id: 31, year: 2025, month: 6, monthName: "Jun", name: "Amr Tarek", type: "Hourly", rate: 350, hours: 12, amount: 4200, status: "Transferred" },
-  { id: 32, year: 2025, month: 6, monthName: "Jun", name: "Tarek Mohamed", type: "Hourly", rate: 150, hours: 11, amount: 1650, status: "Transferred" },
-  { id: 33, year: 2025, month: 7, monthName: "Jul", name: "Rana El Sobky", type: "Hourly", rate: 150, hours: 32, amount: 4800, status: "Transferred" },
-  { id: 34, year: 2025, month: 7, monthName: "Jul", name: "Alaa Ashraf", type: "Hourly", rate: 100, hours: 30, amount: 3000, status: "Transferred" },
-  { id: 35, year: 2025, month: 7, monthName: "Jul", name: "Nada Amin", type: "Hourly", rate: 150, hours: 22, amount: 3300, status: "Transferred" },
-  { id: 36, year: 2025, month: 7, monthName: "Jul", name: "Yasseen Nouh", type: "Hourly", rate: 350, hours: 18, amount: 6300, status: "Transferred" },
-  { id: 37, year: 2025, month: 7, monthName: "Jul", name: "Amr Tarek", type: "Hourly", rate: 350, hours: 15, amount: 5250, status: "Transferred" },
-  { id: 38, year: 2025, month: 7, monthName: "Jul", name: "Tarek Mohamed", type: "Hourly", rate: 150, hours: 12, amount: 1800, status: "Transferred" },
-  { id: 39, year: 2025, month: 8, monthName: "Aug", name: "Rana El Sobky", type: "Hourly", rate: 150, hours: 28, amount: 4200, status: "Transferred" },
-  { id: 40, year: 2025, month: 8, monthName: "Aug", name: "Alaa Ashraf", type: "Hourly", rate: 100, hours: 32, amount: 3200, status: "Transferred" },
-  { id: 41, year: 2025, month: 8, monthName: "Aug", name: "Nada Amin", type: "Hourly", rate: 150, hours: 24, amount: 3600, status: "Transferred" },
-  { id: 42, year: 2025, month: 8, monthName: "Aug", name: "Yasseen Nouh", type: "Hourly", rate: 350, hours: 20, amount: 7000, status: "Transferred" },
-  { id: 43, year: 2025, month: 8, monthName: "Aug", name: "Amr Tarek", type: "Hourly", rate: 350, hours: 16, amount: 5600, status: "Transferred" },
-  { id: 44, year: 2025, month: 8, monthName: "Aug", name: "Tarek Mohamed", type: "Hourly", rate: 150, hours: 14, amount: 2100, status: "Transferred" },
-  { id: 45, year: 2025, month: 9, monthName: "Sep", name: "Alaa Ashraf", type: "Hourly", rate: 100, hours: 35, amount: 3500, status: "Transferred" },
-  { id: 46, year: 2025, month: 9, monthName: "Sep", name: "Nada Amin", type: "Hourly", rate: 150, hours: 26, amount: 3900, status: "Transferred" },
-  { id: 47, year: 2025, month: 9, monthName: "Sep", name: "Yasseen Nouh", type: "Hourly", rate: 350, hours: 22, amount: 7700, status: "Transferred" },
-  { id: 48, year: 2025, month: 9, monthName: "Sep", name: "Amr Tarek", type: "Hourly", rate: 350, hours: 18, amount: 6300, status: "Transferred" },
-  { id: 49, year: 2025, month: 9, monthName: "Sep", name: "Tarek Mohamed", type: "Hourly", rate: 150, hours: 15, amount: 2250, status: "Transferred" },
-  { id: 50, year: 2025, month: 10, monthName: "Oct", name: "Alaa Ashraf", type: "Hourly", rate: 100, hours: 36, amount: 3600, status: "Transferred" },
-  { id: 51, year: 2025, month: 10, monthName: "Oct", name: "Nada Amin", type: "Hourly", rate: 150, hours: 28, amount: 4200, status: "Transferred" },
-  { id: 52, year: 2025, month: 10, monthName: "Oct", name: "Yasseen Nouh", type: "Hourly", rate: 350, hours: 24, amount: 8400, status: "Transferred" },
-  { id: 53, year: 2025, month: 10, monthName: "Oct", name: "Amr Tarek", type: "Hourly", rate: 350, hours: 20, amount: 7000, status: "Transferred" },
-  { id: 54, year: 2025, month: 10, monthName: "Oct", name: "Tarek Mohamed", type: "Hourly", rate: 150, hours: 16, amount: 2400, status: "Transferred" },
-  { id: 55, year: 2025, month: 11, monthName: "Nov", name: "Alaa Ashraf", type: "Hourly", rate: 100, hours: 34, amount: 3400, status: "Transferred" },
-  { id: 56, year: 2025, month: 11, monthName: "Nov", name: "Nada Amin", type: "Hourly", rate: 150, hours: 26, amount: 3900, status: "Transferred" },
-  { id: 57, year: 2025, month: 11, monthName: "Nov", name: "Yasseen Nouh", type: "Hourly", rate: 350, hours: 23, amount: 8050, status: "Transferred" },
-  { id: 58, year: 2025, month: 11, monthName: "Nov", name: "Amr Tarek", type: "Hourly", rate: 350, hours: 19, amount: 6650, status: "Transferred" },
-  { id: 59, year: 2025, month: 11, monthName: "Nov", name: "Tarek Mohamed", type: "Hourly", rate: 150, hours: 14, amount: 2100, status: "Transferred" },
-  { id: 60, year: 2025, month: 12, monthName: "Dec", name: "Amal Hamdy", type: "Fulltime", rate: null, salary: 6000, hours: 0, amount: 6000, status: "Transferred" },
-  { id: 61, year: 2025, month: 12, monthName: "Dec", name: "Alaa Ashraf", type: "Hourly", rate: 100, hours: 32, amount: 3200, status: "Transferred" },
-  { id: 62, year: 2025, month: 12, monthName: "Dec", name: "Nada Amin", type: "Hourly", rate: 150, hours: 24, amount: 3600, status: "Transferred" },
-  { id: 63, year: 2025, month: 12, monthName: "Dec", name: "Yasseen Nouh", type: "Hourly", rate: 350, hours: 20, amount: 7000, status: "Transferred" },
-  { id: 64, year: 2025, month: 12, monthName: "Dec", name: "Amr Tarek", type: "Hourly", rate: 350, hours: 18, amount: 6300, status: "Transferred" },
-  { id: 65, year: 2025, month: 12, monthName: "Dec", name: "Tarek Mohamed", type: "Hourly", rate: 150, hours: 13, amount: 1950, status: "Transferred" },
-  { id: 66, year: 2025, month: 12, monthName: "Dec", name: "Anas Emad", type: "Part-time + Hourly", rate: 170, salary: 12000, hours: 40, amount: 12000, status: "Transferred" },
-  { id: 67, year: 2026, month: 1, monthName: "Jan", name: "Amal Hamdy", type: "Fulltime", rate: null, salary: 6000, hours: 0, amount: 6000, status: "Transferred" },
-  { id: 68, year: 2026, month: 1, monthName: "Jan", name: "Anas Emad", type: "Part-time + Hourly", rate: 170, salary: 12000, hours: 42, amount: 12000, status: "Transferred" },
-  { id: 69, year: 2026, month: 1, monthName: "Jan", name: "Alaa Ashraf", type: "Hourly", rate: 100, hours: 30, amount: 3000, status: "Open" },
-  { id: 70, year: 2026, month: 1, monthName: "Jan", name: "Nada Amin", type: "Hourly", rate: 150, hours: 25, amount: 3750, status: "Open" },
-  { id: 71, year: 2026, month: 1, monthName: "Jan", name: "Yasseen Nouh", type: "Hourly", rate: 350, hours: 22, amount: 7700, status: "Open" },
-  { id: 72, year: 2026, month: 2, monthName: "Feb", name: "Amal Hamdy", type: "Fulltime", rate: null, salary: 6000, hours: 0, amount: 6000, status: "Transferred" },
-  { id: 73, year: 2026, month: 2, monthName: "Feb", name: "Bahaa Mohamed", type: "Part-time + Hourly", rate: null, salary: 30000, hours: 0, amount: 30000, status: "Open" },
-];
-
-const teamRoster = [
-  { name: "Rana El Sobky", type: "Hourly", rate: 150, salary: null, start: "Jan 2025", end: "Aug 2025", active: false },
-  { name: "Abaza", type: "Hourly", rate: 250, salary: null, start: "Jan 2025", end: "Jun 2025", active: false },
-  { name: "Alaa Ashraf", type: "Hourly", rate: 100, salary: null, start: "Jan 2025", end: null, active: true },
-  { name: "Nada Amin", type: "Hourly", rate: 150, salary: null, start: "Jan 2025", end: null, active: true },
-  { name: "Ahmed Hamdy", type: "Hourly", rate: 500, salary: null, start: "Jan 2025", end: null, active: false },
-  { name: "Yasseen Nouh", type: "Hourly", rate: 900, salary: null, start: "Jan 2025", end: null, active: true },
-  { name: "Amr Tarek", type: "Hourly", rate: 350, salary: null, start: "Jan 2025", end: null, active: true },
-  { name: "Tarek Mohamed", type: "Hourly", rate: 150, salary: null, start: "Jan 2025", end: null, active: true },
-  { name: "Amal Hamdy", type: "Fulltime", rate: null, salary: 6000, start: "Jan 2025", end: null, active: true },
-  { name: "Anas Emad", type: "Part-time + Hourly", rate: 170, salary: 12000, start: "Dec 2025", end: null, active: true },
-  { name: "Bahaa Mohamed", type: "Part-time + Hourly", rate: null, salary: 30000, start: "Feb 2026", end: null, active: true },
-];
-
-// Format EGP currency
-const formatEGP = (value) => {
-  if (typeof value !== 'number') return '0 EGP';
-  return new Intl.NumberFormat('en-EG', {
-    style: 'currency',
-    currency: 'EGP',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-};
-
-// Main Dashboard Component
-function RishcaBudgetDashboard() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [password, setPassword] = useState('');
-  const [currentTab, setCurrentTab] = useState('dashboard');
-  const [timeEntries, setTimeEntries] = useState(initialTimeEntries);
-  const [sortConfig, setSortConfig] = useState({ key: 'id', direction: 'asc' });
-  const [filters, setFilters] = useState({ name: '', month: '', year: '', status: '' });
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const [scenarios, setScenarios] = useState({
-    teamCost: 50000,
-    monthlyBurn: 80000,
-    headcount: 11,
-    avgRate: 250,
-  });
-
-  // Vitalis-Layer sync state
-  const [vitalisStatus, setVitalisStatus] = useState({ syncing: false, lastSync: null, count: 0, error: null });
-
-  const syncFromVitalis = useCallback(async (days = 90) => {
-    setVitalisStatus(prev => ({ ...prev, syncing: true, error: null }));
-    try {
-      const res = await fetch(`${VITALIS_API.url}?days=${days}`, {
-        headers: { "x-api-key": VITALIS_API.key },
-      });
-      if (!res.ok) throw new Error(`API returned ${res.status}`);
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-
-      // Convert Supabase time entries to our format
-      const monthNames = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-      const newEntries = (data.entries || []).map((e, idx) => {
-        const logDate = new Date(e.logged_at || e.started_at);
-        const month = logDate.getMonth() + 1;
-        const year = logDate.getFullYear();
-        const hours = Math.round((e.duration_minutes / 60) * 100) / 100;
-        const userName = VITALIS_NAME_MAP[e.user?.name] || e.user?.name || e.user?.email || "Unknown";
-        const member = teamRoster.find(m => m.name === userName);
-        const rate = member?.rate || 0;
-        return {
-          id: 10000 + idx,
-          year,
-          month,
-          monthName: monthNames[month] || "?",
-          name: userName,
-          type: member?.type || "Hourly",
-          rate,
-          hours,
-          amount: member?.type === "Fulltime" ? (member?.salary || 0) : rate * hours,
-          status: "Vitalis",
-          source: "vitalis",
-          task: e.task?.title || "",
-          project: e.task?.project_name || "",
-        };
-      });
-
-      // Merge: keep existing entries, add new Vitalis entries (replace previous Vitalis imports)
-      setTimeEntries(prev => {
-        const manual = prev.filter(e => e.source !== "vitalis");
-        return [...manual, ...newEntries];
-      });
-
-      setVitalisStatus({
-        syncing: false,
-        lastSync: new Date().toLocaleTimeString(),
-        count: newEntries.length,
-        error: null,
-      });
-    } catch (err) {
-      setVitalisStatus(prev => ({ ...prev, syncing: false, error: err.message }));
-    }
-  }, []);
-
-  const handleLogin = (e) => {
-    e.preventDefault();
-    if (password === 'rishca2026') {
-      setIsAuthenticated(true);
-      setPassword('');
-    } else {
-      alert('Invalid password');
-    }
-  };
-
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-    setPassword('');
-    setCurrentTab('dashboard');
-  };
-
-  // Sorting functionality
-  const handleSort = (key) => {
-    let direction = 'asc';
-    if (sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc';
-    }
-    setSortConfig({ key, direction });
-  };
-
-  // Apply filters and sorting
-  const getFilteredAndSortedEntries = () => {
-    let filtered = timeEntries.filter(entry => {
-      if (filters.name && entry.name !== filters.name) return false;
-      if (filters.month && entry.month !== parseInt(filters.month)) return false;
-      if (filters.year && entry.year !== parseInt(filters.year)) return false;
-      if (filters.status && entry.status !== filters.status) return false;
-      return true;
-    });
-
-    filtered.sort((a, b) => {
-      const aValue = a[sortConfig.key];
-      const bValue = b[sortConfig.key];
-      if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
-      if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
-      return 0;
-    });
-
-    return filtered;
-  };
-
-  // Add new entry
-  const handleAddEntry = (newEntry) => {
-    const id = Math.max(...timeEntries.map(e => e.id), 0) + 1;
-    setTimeEntries([...timeEntries, { ...newEntry, id }]);
-    setShowAddForm(false);
-  };
-
-  // Edit entry
-  const handleEditEntry = (id, field, value) => {
-    const updated = timeEntries.map(entry => {
-      if (entry.id === id) {
-        const updated = { ...entry, [field]: value };
-        // Auto-calculate amount if hours or rate changed
-        if ((field === 'hours' || field === 'rate') && entry.rate && entry.hours) {
-          updated.amount = updated.hours * updated.rate;
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rishca OS Budget Dashboard</title>
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/react.production.min.js"></script>
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/react-dom.production.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
         }
-        return updated;
-      }
-      return entry;
-    });
-    setTimeEntries(updated);
-  };
 
-  // Delete entry
-  const handleDeleteEntry = (id) => {
-    setTimeEntries(timeEntries.filter(e => e.id !== id));
-  };
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+        }
 
-  // Calculate KPIs
-  const calculateKPIs = () => {
-    const currentMonth = new Date().getMonth() + 1;
-    const currentYear = new Date().getFullYear();
+        .kpi-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+            border: 1px solid #E2E8F0;
+        }
 
-    const thisMonth = timeEntries
-      .filter(e => e.year === currentYear && e.month === currentMonth)
-      .reduce((sum, e) => sum + e.amount, 0);
+        .kpi-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            transform: translateY(-2px);
+        }
 
-    const allTime = timeEntries.reduce((sum, e) => sum + e.amount, 0);
+        .chart-container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            border: 1px solid #E2E8F0;
+        }
 
-    const uniqueMembers = new Set(timeEntries.map(e => e.name)).size;
+        .status-transferred {
+            background-color: #D1FAE5;
+            color: #065F46;
+            border: 1px solid #6EE7B7;
+        }
 
-    const monthlyAvg = allTime / 12; // Approximate
+        .status-open {
+            background-color: #FEF3C7;
+            color: #92400E;
+            border: 1px solid #FCD34D;
+        }
 
-    return { thisMonth, allTime, uniqueMembers, monthlyAvg };
-  };
+        .badge-active {
+            background-color: #0D9488;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            box-shadow: 0 2px 4px rgba(13, 148, 136, 0.3);
+        }
 
-  // Monthly data for chart
-  const getMonthlyData = () => {
-    const months = ['Mar 25', 'Apr 25', 'May 25', 'Jun 25', 'Jul 25', 'Aug 25', 'Sep 25', 'Oct 25', 'Nov 25', 'Dec 25', 'Jan 26', 'Feb 26'];
-    const data = [];
+        .badge-inactive {
+            background-color: #E2E8F0;
+            color: #475569;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
 
-    for (let i = 0; i < 12; i++) {
-      const monthIndex = i + 3; // Start from March
-      const year = monthIndex > 12 ? 2026 : 2025;
-      const month = monthIndex > 12 ? monthIndex - 12 : monthIndex;
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+        }
 
-      const total = timeEntries
-        .filter(e => e.year === year && e.month === month)
-        .reduce((sum, e) => sum + e.amount, 0);
+        th {
+            background-color: #F8FAFC;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 14px;
+            color: #475569;
+            border-bottom: 2px solid #E2E8F0;
+            cursor: pointer;
+            user-select: none;
+            transition: background-color 0.2s ease;
+        }
 
-      data.push({ month: months[i], amount: total });
-    }
+        th:hover {
+            background-color: #F1F5F9;
+        }
 
-    return data;
-  };
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #E2E8F0;
+            font-size: 14px;
+            color: #334155;
+        }
 
-  // Spending by team member
-  const getSpendByMember = () => {
-    const memberSpend = {};
-    timeEntries.forEach(entry => {
-      if (!memberSpend[entry.name]) {
-        memberSpend[entry.name] = 0;
-      }
-      memberSpend[entry.name] += entry.amount;
-    });
+        tbody tr {
+            transition: background-color 0.2s ease;
+        }
 
-    return Object.entries(memberSpend)
-      .map(([name, amount]) => ({ name, amount }))
-      .sort((a, b) => b.amount - a.amount)
-      .slice(0, 10);
-  };
+        tbody tr:hover {
+            background-color: #F8FAFC;
+        }
 
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
-        <div className="w-full max-w-md">
-          <div className="bg-white rounded-xl shadow-2xl p-8">
-            <div className="text-center mb-8">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-teal-600 rounded-full mb-4">
-                <Lock className="text-white" size={32} />
-              </div>
-              <h1 className="text-3xl font-bold text-slate-900 mb-2">Rishca OS</h1>
-              <p className="text-slate-600">Team Budget Manager</p>
-            </div>
+        .filter-section {
+            background: white;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 20px;
+            border: 1px solid #E2E8F0;
+        }
 
-            <form onSubmit={handleLogin}>
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Password
-                </label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter password"
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                />
-              </div>
-              <button
-                type="submit"
-                className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold py-2 rounded-lg transition"
-              >
-                Sign In
-              </button>
-            </form>
-          </div>
-        </div>
-      </div>
-    );
-  }
+        select, input[type="text"], input[type="password"] {
+            transition: all 0.2s ease;
+        }
 
-  const kpis = calculateKPIs();
-  const monthlyData = getMonthlyData();
-  const spendByMember = getSpendByMember();
-  const filteredEntries = getFilteredAndSortedEntries();
+        select:focus, input[type="text"]:focus, input[type="password"]:focus {
+            outline: none;
+            ring: 2px solid #0D9488;
+            border-color: #0D9488;
+        }
 
-  const uniqueNames = [...new Set(timeEntries.map(e => e.name))].sort();
-  const uniqueMonths = [...new Set(timeEntries.map(e => e.month))].sort((a, b) => a - b);
-  const uniqueYears = [...new Set(timeEntries.map(e => e.year))].sort((a, b) => a - b);
+        input[type="range"] {
+            cursor: pointer;
+            accent-color: #0D9488;
+        }
 
-  return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Header */}
-      <div className="bg-slate-900 text-white sticky top-0 z-40 shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h1 className="text-3xl font-bold">Rishca OS — Team Budget Manager</h1>
-              <p className="text-slate-400">
-                {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => syncFromVitalis(90)}
-                disabled={vitalisStatus.syncing}
-                className="flex items-center gap-2 bg-teal-700 hover:bg-teal-600 disabled:bg-slate-600 px-4 py-2 rounded-lg transition text-sm"
-              >
-                <RefreshCw size={16} className={vitalisStatus.syncing ? 'animate-spin' : ''} />
-                {vitalisStatus.syncing ? 'Syncing...' : 'Sync Vitalis'}
-              </button>
-              {vitalisStatus.lastSync && (
-                <span className="text-xs text-teal-400 flex items-center gap-1">
-                  <Cloud size={12} />
-                  {vitalisStatus.count} entries · {vitalisStatus.lastSync}
-                </span>
-              )}
-              {vitalisStatus.error && (
-                <span className="text-xs text-red-400">{vitalisStatus.error}</span>
-              )}
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg transition"
-              >
-                <LogOut size={18} />
-                Logout
-              </button>
-            </div>
-          </div>
+        button {
+            transition: all 0.2s ease;
+        }
 
-          {/* Navigation Tabs */}
-          <div className="flex gap-1 border-t border-slate-700 pt-4 overflow-x-auto">
-            {['dashboard', 'time-log', 'team', 'salaries', 'scenarios'].map(tab => (
-              <button
-                key={tab}
-                onClick={() => setCurrentTab(tab)}
-                className={`px-4 py-2 font-medium rounded-t-lg transition whitespace-nowrap ${
-                  currentTab === tab
-                    ? 'bg-teal-600 text-white'
-                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                }`}
-              >
-                {tab === 'dashboard' && 'Dashboard'}
-                {tab === 'time-log' && 'Time Log'}
-                {tab === 'team' && 'Team'}
-                {tab === 'salaries' && 'Salaries'}
-                {tab === 'scenarios' && 'Scenarios'}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
+        button:active {
+            transform: scale(0.98);
+        }
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* DASHBOARD TAB */}
-        {currentTab === 'dashboard' && (
-          <div>
-            {/* KPI Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-              <div className="bg-white rounded-lg shadow p-6 border-l-4 border-teal-600">
-                <p className="text-slate-600 text-sm font-medium mb-1">Total Spend This Month</p>
-                <p className="text-3xl font-bold text-slate-900">{formatEGP(kpis.thisMonth)}</p>
-              </div>
-              <div className="bg-white rounded-lg shadow p-6 border-l-4 border-blue-600">
-                <p className="text-slate-600 text-sm font-medium mb-1">Total Spend All Time</p>
-                <p className="text-3xl font-bold text-slate-900">{formatEGP(kpis.allTime)}</p>
-              </div>
-              <div className="bg-white rounded-lg shadow p-6 border-l-4 border-purple-600">
-                <p className="text-slate-600 text-sm font-medium mb-1">Active Team Members</p>
-                <p className="text-3xl font-bold text-slate-900">{kpis.uniqueMembers}</p>
-              </div>
-              <div className="bg-white rounded-lg shadow p-6 border-l-4 border-orange-600">
-                <p className="text-slate-600 text-sm font-medium mb-1">Average Monthly Burn</p>
-                <p className="text-3xl font-bold text-slate-900">{formatEGP(kpis.monthlyAvg)}</p>
-              </div>
-            </div>
+        .error-message {
+            color: #DC2626;
+            font-weight: 500;
+            padding: 8px 12px;
+            background: #FEE2E2;
+            border: 1px solid #FECACA;
+            border-radius: 4px;
+            margin-top: 8px;
+        }
 
-            {/* Charts */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-              <div className="bg-white rounded-lg shadow p-6">
-                <h2 className="text-lg font-bold text-slate-900 mb-4">Monthly Spend Trend</h2>
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={monthlyData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip formatter={(value) => formatEGP(value)} />
-                    <Line type="monotone" dataKey="amount" stroke="#0D9488" strokeWidth={2} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
+        .tab-content-empty {
+            text-align: center;
+            padding: 40px 20px;
+            color: #94A3B8;
+        }
 
-              <div className="bg-white rounded-lg shadow p-6">
-                <h2 className="text-lg font-bold text-slate-900 mb-4">Top 10 Spend by Team Member</h2>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={spendByMember}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} interval={0} tick={{ fontSize: 12 }} />
-                    <YAxis />
-                    <Tooltip formatter={(value) => formatEGP(value)} />
-                    <Bar dataKey="amount" fill="#0D9488" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
+        @media (max-width: 768px) {
+            .chart-container {
+                padding: 15px;
+            }
 
-            {/* Status & Stats */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <div className="bg-white rounded-lg shadow p-6">
-                <h2 className="text-lg font-bold text-slate-900 mb-4">Payment Status</h2>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
-                    <span className="font-medium text-green-900">Transferred</span>
-                    <span className="text-xl font-bold text-green-600">{timeEntries.filter(e => e.status === 'Transferred').length}</span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-                    <span className="font-medium text-yellow-900">Open</span>
-                    <span className="text-xl font-bold text-yellow-600">{timeEntries.filter(e => e.status === 'Open').length}</span>
-                  </div>
-                </div>
-              </div>
+            th {
+                font-size: 12px;
+                padding: 8px;
+            }
 
-              <div className="bg-white rounded-lg shadow p-6">
-                <h2 className="text-lg font-bold text-slate-900 mb-4">Quick Stats</h2>
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-sm text-slate-600">Highest Paid Month</p>
-                    <p className="text-xl font-bold text-slate-900">
-                      {monthlyData.length > 0 ? monthlyData.reduce((max, m) => m.amount > max.amount ? m : max).month : 'N/A'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-slate-600">Lowest Paid Month</p>
-                    <p className="text-xl font-bold text-slate-900">
-                      {monthlyData.length > 0 ? monthlyData.reduce((min, m) => m.amount < min.amount ? m : min).month : 'N/A'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+            td {
+                font-size: 12px;
+                padding: 8px;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div id="root"></div>
 
-        {/* TIME LOG TAB */}
-        {currentTab === 'time-log' && (
-          <div>
-            {/* Filters */}
-            <div className="bg-white rounded-lg shadow p-6 mb-6">
-              <h2 className="text-lg font-bold text-slate-900 mb-4">Filters</h2>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Team Member</label>
-                  <select
-                    value={filters.name}
-                    onChange={(e) => setFilters({ ...filters, name: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500"
-                  >
-                    <option value="">All Members</option>
-                    {uniqueNames.map(name => (
-                      <option key={name} value={name}>{name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Month</label>
-                  <select
-                    value={filters.month}
-                    onChange={(e) => setFilters({ ...filters, month: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500"
-                  >
-                    <option value="">All Months</option>
-                    {uniqueMonths.map(month => {
-                      const monthNames = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                      return <option key={month} value={month}>{monthNames[month]}</option>;
-                    })}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Year</label>
-                  <select
-                    value={filters.year}
-                    onChange={(e) => setFilters({ ...filters, year: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500"
-                  >
-                    <option value="">All Years</option>
-                    {uniqueYears.map(year => (
-                      <option key={year} value={year}>{year}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Status</label>
-                  <select
-                    value={filters.status}
-                    onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500"
-                  >
-                    <option value="">All Status</option>
-                    <option value="Transferred">Transferred</option>
-                    <option value="Open">Open</option>
-                  </select>
-                </div>
-              </div>
-            </div>
+    <script>
+        // ============================================================
+        // RISHCA OS BUDGET DASHBOARD v1.0
+        // Team Budget Management System
+        // Built with React 18, Tailwind CSS, and Chart.js
+        // ============================================================
 
-            {/* Add Entry Button */}
-            <div className="mb-6">
-              <button
-                onClick={() => setShowAddForm(!showAddForm)}
-                className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold px-4 py-2 rounded-lg transition"
-              >
-                <Plus size={18} />
-                Add Entry
-              </button>
-            </div>
+        const { useState, useEffect, useRef } = React;
+        const h = React.createElement;
 
-            {/* Add Form */}
-            {showAddForm && (
-              <div className="bg-white rounded-lg shadow p-6 mb-6 border-l-4 border-teal-600">
-                <AddEntryForm onAdd={handleAddEntry} onCancel={() => setShowAddForm(false)} />
-              </div>
-            )}
+        // ============================================================
+        // UTILITY FUNCTIONS
+        // ============================================================
 
-            {/* Time Entries Table */}
-            <div className="bg-white rounded-lg shadow overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-slate-100 border-b border-slate-300">
-                    <tr>
-                      <th className="px-4 py-3 text-left">
-                        <button onClick={() => handleSort('id')} className="font-semibold text-slate-900 hover:text-teal-600">#</button>
-                      </th>
-                      <th className="px-4 py-3 text-left">
-                        <button onClick={() => handleSort('year')} className="font-semibold text-slate-900 hover:text-teal-600">Year</button>
-                      </th>
-                      <th className="px-4 py-3 text-left">
-                        <button onClick={() => handleSort('monthName')} className="font-semibold text-slate-900 hover:text-teal-600">Month</button>
-                      </th>
-                      <th className="px-4 py-3 text-left">
-                        <button onClick={() => handleSort('name')} className="font-semibold text-slate-900 hover:text-teal-600">Name</button>
-                      </th>
-                      <th className="px-4 py-3 text-left">
-                        <button onClick={() => handleSort('type')} className="font-semibold text-slate-900 hover:text-teal-600">Type</button>
-                      </th>
-                      <th className="px-4 py-3 text-right">
-                        <button onClick={() => handleSort('rate')} className="font-semibold text-slate-900 hover:text-teal-600">Rate</button>
-                      </th>
-                      <th className="px-4 py-3 text-right">
-                        <button onClick={() => handleSort('hours')} className="font-semibold text-slate-900 hover:text-teal-600">Hours</button>
-                      </th>
-                      <th className="px-4 py-3 text-right">
-                        <button onClick={() => handleSort('amount')} className="font-semibold text-slate-900 hover:text-teal-600">Amount</button>
-                      </th>
-                      <th className="px-4 py-3 text-left">
-                        <button onClick={() => handleSort('status')} className="font-semibold text-slate-900 hover:text-teal-600">Status</button>
-                      </th>
-                      <th className="px-4 py-3 text-center font-semibold text-slate-900">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredEntries.map((entry, idx) => (
-                      <tr key={entry.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
-                        <td className="px-4 py-3 text-slate-900">{entry.id}</td>
-                        <td className="px-4 py-3 text-slate-900">{entry.year}</td>
-                        <td className="px-4 py-3 text-slate-900">{entry.monthName}</td>
-                        <td className="px-4 py-3 text-slate-900 font-medium">{entry.name}</td>
-                        <td className="px-4 py-3 text-slate-700">{entry.type}</td>
-                        <td className="px-4 py-3 text-right text-slate-900">
-                          {editingId === entry.id ? (
-                            <input
-                              type="number"
-                              value={entry.rate || ''}
-                              onChange={(e) => handleEditEntry(entry.id, 'rate', parseFloat(e.target.value) || 0)}
-                              className="w-20 px-2 py-1 border border-slate-300 rounded"
-                            />
-                          ) : (
-                            entry.rate ? formatEGP(entry.rate) : '—'
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-right text-slate-900">
-                          {editingId === entry.id ? (
-                            <input
-                              type="number"
-                              step="0.25"
-                              value={entry.hours}
-                              onChange={(e) => handleEditEntry(entry.id, 'hours', parseFloat(e.target.value) || 0)}
-                              className="w-20 px-2 py-1 border border-slate-300 rounded"
-                            />
-                          ) : (
-                            entry.hours.toFixed(2)
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-right text-slate-900 font-semibold">{formatEGP(entry.amount)}</td>
-                        <td className="px-4 py-3">
-                          {editingId === entry.id ? (
-                            <select
-                              value={entry.status}
-                              onChange={(e) => handleEditEntry(entry.id, 'status', e.target.value)}
-                              className="px-2 py-1 border border-slate-300 rounded text-sm"
-                            >
-                              <option>Transferred</option>
-                              <option>Open</option>
-                            </select>
-                          ) : (
-                            <span className={`px-2 py-1 rounded text-xs font-semibold ${entry.status === 'Transferred' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                              {entry.status}
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          {editingId === entry.id ? (
-                            <button
-                              onClick={() => setEditingId(null)}
-                              className="text-green-600 hover:text-green-700"
-                            >
-                              <Save size={16} />
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => setEditingId(entry.id)}
-                              className="text-blue-600 hover:text-blue-700 mr-2"
-                            >
-                              <Edit2 size={16} />
-                            </button>
-                          )}
-                          <button
-                            onClick={() => handleDeleteEntry(entry.id)}
-                            className="text-red-600 hover:text-red-700"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <div className="px-4 py-3 bg-slate-100 border-t border-slate-300">
-                <p className="text-sm text-slate-600">Showing {filteredEntries.length} of {timeEntries.length} entries</p>
-              </div>
-            </div>
-          </div>
-        )}
+        /**
+         * Format Egyptian Pounds currency
+         * @param {number} value - Amount to format
+         * @returns {string} Formatted currency string with EGP symbol
+         */
+        function formatEGP(value) {
+            return new Intl.NumberFormat('en-EG', {
+                style: 'currency',
+                currency: 'EGP',
+                minimumFractionDigits: 0
+            }).format(value);
+        }
 
-        {/* TEAM TAB */}
-        {currentTab === 'team' && (
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900 mb-6">Team Roster</h1>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {teamRoster.map((member) => {
-                const memberEntries = timeEntries.filter(e => e.name === member.name);
-                const totalHours = memberEntries.reduce((sum, e) => sum + e.hours, 0);
-                const totalEarned = memberEntries.reduce((sum, e) => sum + e.amount, 0);
+        /**
+         * Calculate statistics for a given time period
+         * @param {array} data - Array of time entries
+         * @param {number} year - Year to filter
+         * @param {number} month - Month to filter (optional)
+         * @returns {object} Statistics including total amount and count
+         */
+        function getPeriodStats(data, year, month = null) {
+            const filtered = data.filter(e => e.year === year && (!month || e.month === month));
+            return {
+                total: filtered.reduce((sum, e) => sum + e.amount, 0),
+                count: filtered.length,
+                entries: filtered
+            };
+        }
 
-                return (
-                  <div key={member.name} className="bg-white rounded-lg shadow p-6 border-t-4 border-teal-600">
-                    <div className="flex items-start justify-between mb-4">
-                      <div>
-                        <h3 className="text-lg font-bold text-slate-900">{member.name}</h3>
-                        <p className="text-sm text-slate-600">{member.type}</p>
-                      </div>
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${member.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                        {member.active ? 'Active' : 'Inactive'}
-                      </span>
-                    </div>
+        /**
+         * Get unique array of values from data
+         * @param {array} data - Source array
+         * @param {string} key - Key to extract
+         * @returns {array} Sorted unique values
+         */
+        function getUnique(data, key) {
+            return [...new Set(data.map(e => e[key]))].sort();
+        }
 
-                    <div className="space-y-2 mb-4 pt-4 border-t border-slate-200">
-                      {member.rate !== null && (
-                        <div className="flex justify-between">
-                          <span className="text-slate-600">Hourly Rate:</span>
-                          <span className="font-semibold text-slate-900">{formatEGP(member.rate)}</span>
-                        </div>
-                      )}
-                      {member.salary !== null && (
-                        <div className="flex justify-between">
-                          <span className="text-slate-600">Monthly Salary:</span>
-                          <span className="font-semibold text-slate-900">{formatEGP(member.salary)}</span>
-                        </div>
-                      )}
-                      <div className="flex justify-between">
-                        <span className="text-slate-600">Start Date:</span>
-                        <span className="font-semibold text-slate-900">{member.start}</span>
-                      </div>
-                      {member.end && (
-                        <div className="flex justify-between">
-                          <span className="text-slate-600">End Date:</span>
-                          <span className="font-semibold text-slate-900">{member.end}</span>
-                        </div>
-                      )}
-                    </div>
+        /**
+         * Validate password against expected value
+         * @param {string} input - Password input
+         * @returns {boolean} Whether password is correct
+         */
+        function validatePassword(input) {
+            return input === 'rishca2026';
+        }
 
-                    <div className="bg-slate-50 rounded p-3">
-                      <div className="flex justify-between mb-2">
-                        <span className="text-sm text-slate-600">Total Hours Logged:</span>
-                        <span className="font-bold text-slate-900">{totalHours.toFixed(1)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-sm text-slate-600">Total Earned:</span>
-                        <span className="font-bold text-teal-600">{formatEGP(totalEarned)}</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
+        // ============================================================
+        // TIME ENTRIES DATA (70 entries)
+        const entries = [
+            {id:1,year:2025,month:3,mn:"Mar",name:"Rana El Sobky",type:"Hourly",rate:150,hours:18.25,amount:2737.5,status:"Transferred"},
+            {id:2,year:2025,month:3,mn:"Mar",name:"Abaza",type:"Hourly",rate:250,hours:4.5,amount:1125,status:"Transferred"},
+            {id:3,year:2025,month:3,mn:"Mar",name:"Alaa Ashraf",type:"Hourly",rate:100,hours:0,amount:0,status:"Transferred"},
+            {id:4,year:2025,month:4,mn:"Apr",name:"Rana El Sobky",type:"Hourly",rate:250,hours:6,amount:1500,status:"Transferred"},
+            {id:5,year:2025,month:4,mn:"Apr",name:"Abaza",type:"Hourly",rate:400,hours:3.5,amount:1400,status:"Transferred"},
+            {id:6,year:2025,month:4,mn:"Apr",name:"Alaa Ashraf",type:"Hourly",rate:100,hours:7.25,amount:725,status:"Transferred"},
+            {id:7,year:2025,month:4,mn:"Apr",name:"Nada Amin",type:"Hourly",rate:150,hours:17,amount:2550,status:"Transferred"},
+            {id:8,year:2025,month:4,mn:"Apr",name:"Ahmed Hamdy",type:"Hourly",rate:500,hours:9,amount:4500,status:"Transferred"},
+            {id:9,year:2025,month:5,mn:"May",name:"Rana El Sobky",type:"Hourly",rate:250,hours:18,amount:4500,status:"Transferred"},
+            {id:10,year:2025,month:5,mn:"May",name:"Abaza",type:"Hourly",rate:400,hours:4,amount:1600,status:"Transferred"},
+            {id:11,year:2025,month:5,mn:"May",name:"Alaa Ashraf",type:"Hourly",rate:100,hours:1.15,amount:115,status:"Transferred"},
+            {id:12,year:2025,month:5,mn:"May",name:"Nada Amin",type:"Hourly",rate:150,hours:41.78,amount:6267,status:"Transferred"},
+            {id:13,year:2025,month:5,mn:"May",name:"Ahmed Hamdy",type:"Hourly",rate:500,hours:0,amount:0,status:"Transferred"},
+            {id:14,year:2025,month:5,mn:"May",name:"Yasseen Nouh",type:"Hourly",rate:350,hours:8,amount:2800,status:"Transferred"},
+            {id:15,year:2025,month:6,mn:"Jun",name:"Abaza",type:"Hourly",rate:400,hours:3.24,amount:1296,status:"Transferred"},
+            {id:16,year:2025,month:6,mn:"Jun",name:"Alaa Ashraf",type:"Hourly",rate:100,hours:9.59,amount:959,status:"Transferred"},
+            {id:17,year:2025,month:6,mn:"Jun",name:"Nada Amin",type:"Hourly",rate:150,hours:78.4,amount:11760,status:"Transferred"},
+            {id:18,year:2025,month:6,mn:"Jun",name:"Rana El Sobky",type:"Hourly",rate:250,hours:28.16,amount:7040,status:"Transferred"},
+            {id:19,year:2025,month:6,mn:"Jun",name:"Yasseen Nouh",type:"Hourly",rate:350,hours:16,amount:5600,status:"Transferred"},
+            {id:20,year:2025,month:7,mn:"Jul",name:"Rana El Sobky",type:"Hourly",rate:250,hours:9.17,amount:2292.5,status:"Transferred"},
+            {id:21,year:2025,month:7,mn:"Jul",name:"Abaza",type:"Hourly",rate:400,hours:0,amount:0,status:"Transferred"},
+            {id:22,year:2025,month:7,mn:"Jul",name:"Alaa Ashraf",type:"Hourly",rate:100,hours:10.2,amount:1020,status:"Transferred"},
+            {id:23,year:2025,month:7,mn:"Jul",name:"Nada Amin",type:"Hourly",rate:150,hours:13.5,amount:2025,status:"Transferred"},
+            {id:24,year:2025,month:7,mn:"Jul",name:"Yasseen Nouh",type:"Hourly",rate:350,hours:9,amount:3150,status:"Transferred"},
+            {id:25,year:2025,month:7,mn:"Jul",name:"Amr Tarek",type:"Hourly",rate:350,hours:13.2,amount:4620,status:"Transferred"},
+            {id:26,year:2025,month:8,mn:"Aug",name:"Rana El Sobky",type:"Hourly",rate:250,hours:4.75,amount:1188,status:"Transferred"},
+            {id:27,year:2025,month:8,mn:"Aug",name:"Alaa Ashraf",type:"Hourly",rate:100,hours:0,amount:0,status:"Transferred"},
+            {id:28,year:2025,month:8,mn:"Aug",name:"Nada Amin",type:"Hourly",rate:150,hours:2.5,amount:375,status:"Transferred"},
+            {id:29,year:2025,month:8,mn:"Aug",name:"Yasseen Nouh",type:"Hourly",rate:350,hours:30,amount:10500,status:"Transferred"},
+            {id:30,year:2025,month:8,mn:"Aug",name:"Amr Tarek",type:"Hourly",rate:350,hours:56.25,amount:19688,status:"Transferred"},
+            {id:31,year:2025,month:9,mn:"Sep",name:"Alaa Ashraf",type:"Hourly",rate:100,hours:10.2,amount:1020,status:"Transferred"},
+            {id:32,year:2025,month:9,mn:"Sep",name:"Nada Amin",type:"Hourly",rate:150,hours:3.5,amount:525,status:"Transferred"},
+            {id:33,year:2025,month:9,mn:"Sep",name:"Yasseen Nouh",type:"Hourly",rate:350,hours:66.19,amount:23167,status:"Transferred"},
+            {id:34,year:2025,month:9,mn:"Sep",name:"Amr Tarek",type:"Hourly",rate:350,hours:72,amount:25200,status:"Transferred"},
+            {id:35,year:2025,month:9,mn:"Sep",name:"Tarek Mohamed",type:"Hourly",rate:150,hours:6.19,amount:929,status:"Transferred"},
+            {id:36,year:2025,month:9,mn:"Sep",name:"Amal Hamdy",type:"Fulltime",rate:null,hours:0,amount:4000,status:"Transferred"},
+            {id:37,year:2025,month:10,mn:"Oct",name:"Alaa Ashraf",type:"Hourly",rate:100,hours:5,amount:500,status:"Transferred"},
+            {id:38,year:2025,month:10,mn:"Oct",name:"Nada Amin",type:"Hourly",rate:150,hours:5.25,amount:788,status:"Transferred"},
+            {id:39,year:2025,month:10,mn:"Oct",name:"Yasseen Nouh",type:"Hourly",rate:350,hours:46,amount:16100,status:"Transferred"},
+            {id:40,year:2025,month:10,mn:"Oct",name:"Amr Tarek",type:"Hourly",rate:350,hours:67.5,amount:23625,status:"Transferred"},
+            {id:41,year:2025,month:10,mn:"Oct",name:"Tarek Mohamed",type:"Hourly",rate:150,hours:39.3,amount:5895,status:"Transferred"},
+            {id:42,year:2025,month:10,mn:"Oct",name:"Amal Hamdy",type:"Fulltime",rate:null,hours:111,amount:6000,status:"Transferred"},
+            {id:43,year:2025,month:11,mn:"Nov",name:"Alaa Ashraf",type:"Hourly",rate:100,hours:0,amount:0,status:"Transferred"},
+            {id:44,year:2025,month:11,mn:"Nov",name:"Nada Amin",type:"Hourly",rate:150,hours:91,amount:13650,status:"Transferred"},
+            {id:45,year:2025,month:11,mn:"Nov",name:"Yasseen Nouh",type:"Hourly",rate:350,hours:0,amount:0,status:"Transferred"},
+            {id:46,year:2025,month:11,mn:"Nov",name:"Amr Tarek",type:"Hourly",rate:350,hours:65.75,amount:23012.5,status:"Transferred"},
+            {id:47,year:2025,month:11,mn:"Nov",name:"Tarek Mohamed",type:"Hourly",rate:150,hours:25.5,amount:3825,status:"Transferred"},
+            {id:48,year:2025,month:11,mn:"Nov",name:"Amal Hamdy",type:"Fulltime",rate:null,hours:0,amount:6000,status:"Transferred"},
+            {id:49,year:2025,month:12,mn:"Dec",name:"Alaa Ashraf",type:"Hourly",rate:100,hours:2,amount:200,status:"Open"},
+            {id:50,year:2025,month:12,mn:"Dec",name:"Nada Amin",type:"Hourly",rate:150,hours:35,amount:5250,status:"Transferred"},
+            {id:51,year:2025,month:12,mn:"Dec",name:"Yasseen Nouh",type:"Hourly",rate:350,hours:41,amount:14350,status:"Transferred"},
+            {id:52,year:2025,month:12,mn:"Dec",name:"Amr Tarek",type:"Hourly",rate:350,hours:77.14,amount:26999,status:"Transferred"},
+            {id:53,year:2025,month:12,mn:"Dec",name:"Tarek Mohamed",type:"Hourly",rate:150,hours:25,amount:3750,status:"Transferred"},
+            {id:54,year:2025,month:12,mn:"Dec",name:"Amal Hamdy",type:"Fulltime",rate:null,hours:0,amount:6000,status:"Transferred"},
+            {id:55,year:2025,month:12,mn:"Dec",name:"Anas Emad",type:"Part-time",rate:170,hours:50,amount:12500,status:"Transferred"},
+            {id:56,year:2026,month:1,mn:"Jan",name:"Alaa Ashraf",type:"Hourly",rate:100,hours:2.5,amount:250,status:"Open"},
+            {id:57,year:2026,month:1,mn:"Jan",name:"Nada Amin",type:"Hourly",rate:150,hours:81,amount:12150,status:"Transferred"},
+            {id:58,year:2026,month:1,mn:"Jan",name:"Yasseen Nouh",type:"Hourly",rate:350,hours:27.1,amount:9485,status:"Transferred"},
+            {id:59,year:2026,month:1,mn:"Jan",name:"Amr Tarek",type:"Hourly",rate:350,hours:66,amount:23100,status:"Transferred"},
+            {id:60,year:2026,month:1,mn:"Jan",name:"Tarek Mohamed",type:"Hourly",rate:150,hours:22,amount:3300,status:"Transferred"},
+            {id:61,year:2026,month:1,mn:"Jan",name:"Amal Hamdy",type:"Fulltime",rate:null,hours:0,amount:6000,status:"Transferred"},
+            {id:62,year:2026,month:1,mn:"Jan",name:"Anas Emad",type:"Part-time",rate:170,hours:99.2,amount:16870.75,status:"Transferred"},
+            {id:63,year:2026,month:2,mn:"Feb",name:"Alaa Ashraf",type:"Hourly",rate:100,hours:0,amount:0,status:"Open"},
+            {id:64,year:2026,month:2,mn:"Feb",name:"Nada Amin",type:"Hourly",rate:150,hours:22.85,amount:3427.5,status:"Transferred"},
+            {id:65,year:2026,month:2,mn:"Feb",name:"Yasseen Nouh",type:"Hourly",rate:900,hours:33.95,amount:30555,status:"Transferred"},
+            {id:66,year:2026,month:2,mn:"Feb",name:"Amr Tarek",type:"Hourly",rate:350,hours:55.15,amount:19302.5,status:"Transferred"},
+            {id:67,year:2026,month:2,mn:"Feb",name:"Tarek Mohamed",type:"Hourly",rate:150,hours:18.75,amount:2812.5,status:"Transferred"},
+            {id:68,year:2026,month:2,mn:"Feb",name:"Amal Hamdy",type:"Fulltime",rate:null,hours:118.55,amount:6000,status:"Transferred"},
+            {id:69,year:2026,month:2,mn:"Feb",name:"Anas Emad",type:"Part-time",rate:170,hours:73,amount:12000,status:"Transferred"},
+            {id:70,year:2026,month:2,mn:"Feb",name:"Bahaa Mohamed",type:"Part-time",rate:null,hours:18,amount:16363.64,status:"Transferred"},
+        ];
 
-        {/* SALARIES TAB */}
-        {currentTab === 'salaries' && (
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900 mb-6">Salaried Employees</h1>
+        // TEAM DATA
+        const team = [
+            {name:"Rana El Sobky",type:"Hourly",rate:150,salary:null,start:"Jan 2025",end:"Aug 2025",active:false},
+            {name:"Abaza",type:"Hourly",rate:250,salary:null,start:"Jan 2025",end:"Jun 2025",active:false},
+            {name:"Alaa Ashraf",type:"Hourly",rate:100,salary:null,start:"Jan 2025",end:null,active:true},
+            {name:"Nada Amin",type:"Hourly",rate:150,salary:null,start:"Jan 2025",end:null,active:true},
+            {name:"Ahmed Hamdy",type:"Hourly",rate:500,salary:null,start:"Jan 2025",end:null,active:false},
+            {name:"Yasseen Nouh",type:"Hourly",rate:900,salary:null,start:"Jan 2025",end:null,active:true},
+            {name:"Amr Tarek",type:"Hourly",rate:350,salary:null,start:"Jan 2025",end:null,active:true},
+            {name:"Tarek Mohamed",type:"Hourly",rate:150,salary:null,start:"Jan 2025",end:null,active:true},
+            {name:"Amal Hamdy",type:"Fulltime",rate:null,salary:6000,start:"Sep 2025",end:null,active:true},
+            {name:"Anas Emad",type:"Part-time",rate:170,salary:12000,start:"Dec 2025",end:null,active:true},
+            {name:"Bahaa Mohamed",type:"Part-time",rate:null,salary:30000,start:"Feb 2026",end:null,active:true},
+        ];
 
-            <div className="space-y-6">
-              {/* Amal Hamdy */}
-              <div className="bg-white rounded-lg shadow p-6 border-l-4 border-blue-600">
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <h3 className="text-xl font-bold text-slate-900">Amal Hamdy</h3>
-                    <p className="text-slate-600">Fulltime Employee</p>
-                  </div>
-                  <span className="px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">Active</span>
-                </div>
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <p className="text-sm text-slate-600 mb-1">Monthly Salary</p>
-                    <p className="text-2xl font-bold text-slate-900">{formatEGP(6000)}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-slate-600 mb-1">Start Date</p>
-                    <p className="text-lg font-semibold text-slate-900">Jan 2025</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-slate-600 mb-1">Months Paid</p>
-                    <p className="text-2xl font-bold text-teal-600">3</p>
-                  </div>
-                </div>
-                <div className="mt-4 p-3 bg-green-50 rounded border border-green-200">
-                  <p className="text-sm font-semibold text-green-900">On Schedule</p>
-                </div>
-              </div>
+        // ============================================================
+        // API CONFIGURATION
+        // ============================================================
+        const VITALIS_API = "https://llrvrcgwhvcaqvscpnsi.supabase.co/functions/v1/team-time-log";
+        const VITALIS_KEY = "TiQwbG47NLUKYhg";
 
-              {/* Anas Emad */}
-              <div className="bg-white rounded-lg shadow p-6 border-l-4 border-purple-600">
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <h3 className="text-xl font-bold text-slate-900">Anas Emad</h3>
-                    <p className="text-slate-600">Part-time + Hourly (Started Dec 2025)</p>
-                  </div>
-                  <span className="px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">Active</span>
-                </div>
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <p className="text-sm text-slate-600 mb-1">Monthly Salary</p>
-                    <p className="text-2xl font-bold text-slate-900">{formatEGP(12000)}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-slate-600 mb-1">Hourly Rate</p>
-                    <p className="text-lg font-semibold text-slate-900">{formatEGP(170)}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-slate-600 mb-1">Months Paid</p>
-                    <p className="text-2xl font-bold text-teal-600">2</p>
-                  </div>
-                </div>
-                <div className="mt-4 p-3 bg-green-50 rounded border border-green-200">
-                  <p className="text-sm font-semibold text-green-900">On Schedule</p>
-                </div>
-              </div>
+        // ============================================================
+        // LOGIN SCREEN COMPONENT
+        // ============================================================
+        /**
+         * LoginScreen - Password-protected access gate
+         * Validates password against 'rishca2026'
+         */
+        function LoginScreen({ onLogin }) {
+            const [password, setPassword] = useState('');
+            const [error, setError] = useState('');
+            const [attemptCount, setAttemptCount] = useState(0);
 
-              {/* Bahaa Mohamed */}
-              <div className="bg-white rounded-lg shadow p-6 border-l-4 border-orange-600">
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <h3 className="text-xl font-bold text-slate-900">Bahaa Mohamed</h3>
-                    <p className="text-slate-600">Part-time + Hourly (Started Feb 2026)</p>
-                  </div>
-                  <span className="px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">Active</span>
-                </div>
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <p className="text-sm text-slate-600 mb-1">Monthly Salary</p>
-                    <p className="text-2xl font-bold text-slate-900">{formatEGP(30000)}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-slate-600 mb-1">Start Date</p>
-                    <p className="text-lg font-semibold text-slate-900">Feb 15, 2026</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-slate-600 mb-1">Months Paid</p>
-                    <p className="text-2xl font-bold text-teal-600">1</p>
-                  </div>
-                </div>
-                <div className="mt-4 p-3 bg-yellow-50 rounded border border-yellow-200">
-                  <p className="text-sm font-semibold text-yellow-900">Monitor - New Start</p>
-                </div>
-              </div>
-            </div>
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                if (validatePassword(password)) {
+                    setError('');
+                    setAttemptCount(0);
+                    onLogin();
+                } else {
+                    setError('Invalid password. Please try again.');
+                    setPassword('');
+                    setAttemptCount(attemptCount + 1);
+                }
+            };
 
-            {/* Summary */}
-            <div className="mt-8 bg-slate-100 rounded-lg p-6">
-              <h3 className="text-lg font-bold text-slate-900 mb-4">Salary Summary</h3>
-              <div className="grid grid-cols-3 gap-6">
-                <div>
-                  <p className="text-slate-600 text-sm mb-1">Total Monthly Payroll</p>
-                  <p className="text-3xl font-bold text-slate-900">{formatEGP(6000 + 12000 + 30000)}</p>
-                </div>
-                <div>
-                  <p className="text-slate-600 text-sm mb-1">Annual Commitment</p>
-                  <p className="text-3xl font-bold text-slate-900">{formatEGP((6000 + 12000 + 30000) * 12)}</p>
-                </div>
-                <div>
-                  <p className="text-slate-600 text-sm mb-1">Salaried Employees</p>
-                  <p className="text-3xl font-bold text-slate-900">3</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+            return h('div', { className: 'min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center' },
+                h('div', { className: 'w-full max-w-md' },
+                    h('div', { className: 'bg-white rounded-lg shadow-2xl p-8' },
+                        h('div', { className: 'text-center mb-8' },
+                            h('div', { className: 'text-4xl font-bold text-slate-900 mb-2' }, 'RISHCA OS'),
+                            h('div', { className: 'text-lg text-teal-600 font-semibold' }, 'Budget Dashboard')
+                        ),
+                        h('form', { onSubmit: handleSubmit, className: 'space-y-6' },
+                            h('div', null,
+                                h('label', { className: 'block text-sm font-medium text-slate-700 mb-2' }, 'Password'),
+                                h('input', {
+                                    type: 'password',
+                                    value: password,
+                                    onChange: (e) => setPassword(e.target.value),
+                                    className: 'w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent',
+                                    placeholder: 'Enter password'
+                                })
+                            ),
+                            error && h('div', { className: 'text-red-600 text-sm font-medium' }, error),
+                            h('button', {
+                                type: 'submit',
+                                className: 'w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg transition'
+                            }, 'Access Dashboard')
+                        ),
+                        h('div', { className: 'mt-8 pt-8 border-t border-slate-200 text-center' },
+                            h('p', { className: 'text-sm text-slate-600' }, 'Rishca OS v1.0'),
+                            h('p', { className: 'text-xs text-slate-500 mt-1' }, 'Team Budget Management System')
+                        )
+                    )
+                )
+            );
+        }
 
-        {/* SCENARIOS TAB */}
-        {currentTab === 'scenarios' && (
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900 mb-6">Financial Scenarios</h1>
+        // ============================================================
+        // DASHBOARD TAB COMPONENT
+        // ============================================================
+        /**
+         * DashboardTab - Main overview with KPIs and charts
+         * Displays key metrics and visualizations
+         */
+        function DashboardTab() {
+            const currentMonth = 2;
+            const currentYear = 2026;
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Inputs */}
-              <div className="bg-white rounded-lg shadow p-6">
-                <h2 className="text-lg font-bold text-slate-900 mb-6">Model Assumptions</h2>
+            // Calculate core metrics
+            const thisMonthAmount = entries
+                .filter(e => e.year === currentYear && e.month === currentMonth)
+                .reduce((sum, e) => sum + e.amount, 0);
 
-                <div className="space-y-6">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
-                      Team Cost (Monthly): {formatEGP(scenarios.teamCost)}
-                    </label>
-                    <input
-                      type="range"
-                      min="10000"
-                      max="150000"
-                      step="1000"
-                      value={scenarios.teamCost}
-                      onChange={(e) => setScenarios({ ...scenarios, teamCost: parseInt(e.target.value) })}
-                      className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
-                    />
-                  </div>
+            const allTimeAmount = entries.reduce((sum, e) => sum + e.amount, 0);
+            const activeMembers = team.filter(t => t.active).length;
 
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
-                      Monthly Burn Rate: {formatEGP(scenarios.monthlyBurn)}
-                    </label>
-                    <input
-                      type="range"
-                      min="20000"
-                      max="200000"
-                      step="5000"
-                      value={scenarios.monthlyBurn}
-                      onChange={(e) => setScenarios({ ...scenarios, monthlyBurn: parseInt(e.target.value) })}
-                      className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
-                    />
-                  </div>
+            const monthlyTotals = {};
+            entries.forEach(e => {
+                const key = `${e.year}-${String(e.month).padStart(2, '0')}`;
+                monthlyTotals[key] = (monthlyTotals[key] || 0) + e.amount;
+            });
+            const avgMonthlyBurn = Object.values(monthlyTotals).reduce((a, b) => a + b, 0) / Object.keys(monthlyTotals).length;
 
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
-                      Headcount: {scenarios.headcount}
-                    </label>
-                    <input
-                      type="range"
-                      min="1"
-                      max="30"
-                      step="1"
-                      value={scenarios.headcount}
-                      onChange={(e) => setScenarios({ ...scenarios, headcount: parseInt(e.target.value) })}
-                      className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
-                    />
-                  </div>
+            useEffect(() => {
+                const ctxLine = document.getElementById('monthlyChart');
+                if (ctxLine && ctxLine.parentElement) {
+                    const months = Object.keys(monthlyTotals).sort();
+                    new Chart(ctxLine, {
+                        type: 'line',
+                        data: {
+                            labels: months.map(m => {
+                                const [y, mo] = m.split('-');
+                                const d = new Date(y, parseInt(mo) - 1);
+                                return d.toLocaleDateString('en-EG', { month: 'short', year: '2-digit' });
+                            }),
+                            datasets: [{
+                                label: 'Monthly Spend (EGP)',
+                                data: months.map(m => monthlyTotals[m]),
+                                borderColor: '#0D9488',
+                                backgroundColor: 'rgba(13, 148, 136, 0.1)',
+                                tension: 0.4,
+                                fill: true,
+                                pointRadius: 6,
+                                pointBackgroundColor: '#0D9488',
+                                pointBorderColor: '#fff',
+                                pointBorderWidth: 2
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: true,
+                            plugins: {
+                                legend: { display: true, position: 'top' }
+                            },
+                            scales: {
+                                y: { beginAtZero: true }
+                            }
+                        }
+                    });
+                }
 
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
-                      Average Rate: {formatEGP(scenarios.avgRate)}
-                    </label>
-                    <input
-                      type="range"
-                      min="50"
-                      max="1000"
-                      step="10"
-                      value={scenarios.avgRate}
-                      onChange={(e) => setScenarios({ ...scenarios, avgRate: parseInt(e.target.value) })}
-                      className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
-                    />
-                  </div>
-                </div>
-              </div>
+                const ctxBar = document.getElementById('personChart');
+                if (ctxBar && ctxBar.parentElement) {
+                    const personTotals = {};
+                    entries.forEach(e => {
+                        personTotals[e.name] = (personTotals[e.name] || 0) + e.amount;
+                    });
+                    const people = Object.keys(personTotals).sort((a, b) => personTotals[b] - personTotals[a]);
 
-              {/* Projections */}
-              <div className="bg-white rounded-lg shadow p-6">
-                <h2 className="text-lg font-bold text-slate-900 mb-6">Projected P&L Impact</h2>
+                    new Chart(ctxBar, {
+                        type: 'bar',
+                        data: {
+                            labels: people,
+                            datasets: [{
+                                label: 'Total Earned (EGP)',
+                                data: people.map(p => personTotals[p]),
+                                backgroundColor: '#0D9488',
+                                borderRadius: 6
+                            }]
+                        },
+                        options: {
+                            indexAxis: 'y',
+                            responsive: true,
+                            maintainAspectRatio: true,
+                            plugins: {
+                                legend: { display: false }
+                            }
+                        }
+                    });
+                }
+            }, []);
 
-                <div className="space-y-4">
-                  <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
-                    <p className="text-sm text-slate-600 mb-1">Team Cost (Monthly)</p>
-                    <p className="text-2xl font-bold text-slate-900">{formatEGP(scenarios.teamCost)}</p>
-                  </div>
+            return h('div', null,
+                h('div', { className: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6' },
+                    h('div', { className: 'kpi-card' },
+                        h('div', { className: 'text-sm text-slate-600 mb-1' }, 'This Month'),
+                        h('div', { className: 'text-3xl font-bold text-slate-900' }, formatEGP(thisMonthAmount))
+                    ),
+                    h('div', { className: 'kpi-card' },
+                        h('div', { className: 'text-sm text-slate-600 mb-1' }, 'All Time'),
+                        h('div', { className: 'text-3xl font-bold text-slate-900' }, formatEGP(allTimeAmount))
+                    ),
+                    h('div', { className: 'kpi-card' },
+                        h('div', { className: 'text-sm text-slate-600 mb-1' }, 'Active Members'),
+                        h('div', { className: 'text-3xl font-bold text-teal-600' }, activeMembers)
+                    ),
+                    h('div', { className: 'kpi-card' },
+                        h('div', { className: 'text-sm text-slate-600 mb-1' }, 'Avg Monthly Burn'),
+                        h('div', { className: 'text-3xl font-bold text-slate-900' }, formatEGP(avgMonthlyBurn))
+                    )
+                ),
+                h('div', { className: 'grid grid-cols-1 lg:grid-cols-2 gap-6' },
+                    h('div', { className: 'chart-container' },
+                        h('h3', { className: 'text-lg font-bold text-slate-900 mb-4' }, 'Monthly Spend Trend'),
+                        h('canvas', { id: 'monthlyChart', height: '300' })
+                    ),
+                    h('div', { className: 'chart-container' },
+                        h('h3', { className: 'text-lg font-bold text-slate-900 mb-4' }, 'Top Earners'),
+                        h('canvas', { id: 'personChart', height: '300' })
+                    )
+                )
+            );
+        }
 
-                  <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
-                    <p className="text-sm text-slate-600 mb-1">Monthly Burn Rate</p>
-                    <p className="text-2xl font-bold text-slate-900">{formatEGP(scenarios.monthlyBurn)}</p>
-                  </div>
+        // ============================================================
+        // TIME LOG TAB COMPONENT
+        // ============================================================
+        /**
+         * TimeLogTab - Complete time entry log with filtering and sorting
+         * Supports filtering by name, month, year, and status
+         * Supports sorting by any column with ascending/descending toggle
+         */
+        function TimeLogTab() {
+            const [filteredEntries, setFilteredEntries] = useState(entries);
+            const [nameFilter, setNameFilter] = useState('');
+            const [monthFilter, setMonthFilter] = useState('');
+            const [yearFilter, setYearFilter] = useState('');
+            const [statusFilter, setStatusFilter] = useState('');
+            const [sortKey, setSortKey] = useState('id');
+            const [sortAsc, setSortAsc] = useState(true);
 
-                  <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
-                    <p className="text-sm text-slate-600 mb-1">Net Monthly Impact (Team)</p>
-                    <p className={`text-2xl font-bold ${scenarios.monthlyBurn - scenarios.teamCost > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {formatEGP(scenarios.monthlyBurn - scenarios.teamCost)}
-                    </p>
-                  </div>
+            useEffect(() => {
+                let result = entries.filter(e => {
+                    if (nameFilter && !e.name.includes(nameFilter)) return false;
+                    if (monthFilter && e.month !== parseInt(monthFilter)) return false;
+                    if (yearFilter && e.year !== parseInt(yearFilter)) return false;
+                    if (statusFilter && e.status !== statusFilter) return false;
+                    return true;
+                });
 
-                  <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
-                    <p className="text-sm text-slate-600 mb-1">Annual Team Cost</p>
-                    <p className="text-2xl font-bold text-slate-900">{formatEGP(scenarios.teamCost * 12)}</p>
-                  </div>
+                result.sort((a, b) => {
+                    let aVal = a[sortKey];
+                    let bVal = b[sortKey];
+                    if (aVal < bVal) return sortAsc ? -1 : 1;
+                    if (aVal > bVal) return sortAsc ? 1 : -1;
+                    return 0;
+                });
 
-                  <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                    <p className="text-sm text-blue-600 mb-1">Avg Cost Per Person</p>
-                    <p className="text-2xl font-bold text-blue-900">{formatEGP(scenarios.teamCost / scenarios.headcount)}</p>
-                  </div>
+                setFilteredEntries(result);
+            }, [nameFilter, monthFilter, yearFilter, statusFilter, sortKey, sortAsc]);
 
-                  <div className="p-4 bg-teal-50 rounded-lg border border-teal-200">
-                    <p className="text-sm text-teal-600 mb-1">Runway (months)</p>
-                    <p className="text-2xl font-bold text-teal-900">
-                      {((scenarios.monthlyBurn - scenarios.teamCost) > 0
-                        ? '∞'
-                        : (Math.abs(scenarios.monthlyBurn - scenarios.teamCost) > 0
-                          ? Math.floor(500000 / Math.abs(scenarios.monthlyBurn - scenarios.teamCost))
-                          : 'N/A'))}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
+            const handleSort = (key) => {
+                if (sortKey === key) {
+                    setSortAsc(!sortAsc);
+                } else {
+                    setSortKey(key);
+                    setSortAsc(true);
+                }
+            };
 
-            {/* Scenario Table */}
-            <div className="mt-8 bg-white rounded-lg shadow overflow-hidden">
-              <div className="p-6 border-b border-slate-200">
-                <h3 className="text-lg font-bold text-slate-900">What-If Scenarios</h3>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-slate-100 border-b border-slate-300">
-                    <tr>
-                      <th className="px-4 py-3 text-left font-semibold text-slate-900">Scenario</th>
-                      <th className="px-4 py-3 text-right font-semibold text-slate-900">Team Cost</th>
-                      <th className="px-4 py-3 text-right font-semibold text-slate-900">Headcount</th>
-                      <th className="px-4 py-3 text-right font-semibold text-slate-900">Avg Cost/Person</th>
-                      <th className="px-4 py-3 text-right font-semibold text-slate-900">Impact</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr className="bg-white border-b border-slate-200">
-                      <td className="px-4 py-3 font-semibold text-slate-900">Current</td>
-                      <td className="px-4 py-3 text-right text-slate-900">{formatEGP(scenarios.teamCost)}</td>
-                      <td className="px-4 py-3 text-right text-slate-900">{scenarios.headcount}</td>
-                      <td className="px-4 py-3 text-right text-slate-900">{formatEGP(scenarios.teamCost / scenarios.headcount)}</td>
-                      <td className="px-4 py-3 text-right font-semibold">Baseline</td>
-                    </tr>
-                    <tr className="bg-green-50">
-                      <td className="px-4 py-3 font-semibold text-slate-900">-1 Headcount</td>
-                      <td className="px-4 py-3 text-right text-slate-900">{formatEGP(scenarios.teamCost * (scenarios.headcount - 1) / scenarios.headcount)}</td>
-                      <td className="px-4 py-3 text-right text-slate-900">{scenarios.headcount - 1}</td>
-                      <td className="px-4 py-3 text-right text-slate-900">{formatEGP(scenarios.teamCost / scenarios.headcount)}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-green-600">Save {formatEGP(scenarios.teamCost / scenarios.headcount)}</td>
-                    </tr>
-                    <tr className="bg-red-50">
-                      <td className="px-4 py-3 font-semibold text-slate-900">+1 Headcount</td>
-                      <td className="px-4 py-3 text-right text-slate-900">{formatEGP(scenarios.teamCost * (scenarios.headcount + 1) / scenarios.headcount)}</td>
-                      <td className="px-4 py-3 text-right text-slate-900">{scenarios.headcount + 1}</td>
-                      <td className="px-4 py-3 text-right text-slate-900">{formatEGP(scenarios.teamCost / scenarios.headcount)}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-red-600">Add {formatEGP(scenarios.teamCost / scenarios.headcount)}</td>
-                    </tr>
-                    <tr className="bg-orange-50">
-                      <td className="px-4 py-3 font-semibold text-slate-900">+10% Rates</td>
-                      <td className="px-4 py-3 text-right text-slate-900">{formatEGP(scenarios.teamCost * 1.1)}</td>
-                      <td className="px-4 py-3 text-right text-slate-900">{scenarios.headcount}</td>
-                      <td className="px-4 py-3 text-right text-slate-900">{formatEGP((scenarios.teamCost * 1.1) / scenarios.headcount)}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-orange-600">Add {formatEGP(scenarios.teamCost * 0.1)}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
+            const uniqueNames = [...new Set(entries.map(e => e.name))].sort();
+            const uniqueMonths = [...new Set(entries.map(e => e.month))].sort((a, b) => a - b);
+            const uniqueYears = [...new Set(entries.map(e => e.year))].sort((a, b) => b - a);
 
-// Add Entry Form Component
-function AddEntryForm({ onAdd, onCancel }) {
-  const [formData, setFormData] = useState({
-    year: 2026,
-    month: 2,
-    monthName: 'Feb',
-    name: '',
-    type: 'Hourly',
-    rate: 0,
-    hours: 0,
-    amount: 0,
-    status: 'Open',
-  });
+            return h('div', null,
+                h('h2', { className: 'text-2xl font-bold text-slate-900 mb-6' }, 'Time Log - All Entries'),
+                h('div', { className: 'bg-white rounded-lg shadow overflow-x-auto mb-6' },
+                    h('div', { className: 'flex gap-4 p-4 border-b flex-wrap' },
+                        h('select', {
+                            value: nameFilter,
+                            onChange: (e) => setNameFilter(e.target.value),
+                            className: 'px-3 py-2 border border-slate-300 rounded text-sm'
+                        },
+                            h('option', { value: '' }, 'All Names'),
+                            uniqueNames.map(n => h('option', { key: n, value: n }, n))
+                        ),
+                        h('select', {
+                            value: monthFilter,
+                            onChange: (e) => setMonthFilter(e.target.value),
+                            className: 'px-3 py-2 border border-slate-300 rounded text-sm'
+                        },
+                            h('option', { value: '' }, 'All Months'),
+                            uniqueMonths.map(m => h('option', { key: m, value: m }, ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m-1]))
+                        ),
+                        h('select', {
+                            value: yearFilter,
+                            onChange: (e) => setYearFilter(e.target.value),
+                            className: 'px-3 py-2 border border-slate-300 rounded text-sm'
+                        },
+                            h('option', { value: '' }, 'All Years'),
+                            uniqueYears.map(y => h('option', { key: y, value: y }, y))
+                        ),
+                        h('select', {
+                            value: statusFilter,
+                            onChange: (e) => setStatusFilter(e.target.value),
+                            className: 'px-3 py-2 border border-slate-300 rounded text-sm'
+                        },
+                            h('option', { value: '' }, 'All Status'),
+                            h('option', { value: 'Transferred' }, 'Transferred'),
+                            h('option', { value: 'Open' }, 'Open')
+                        )
+                    ),
+                    h('div', { style: { overflowX: 'auto' } },
+                        h('table', null,
+                            h('thead', null,
+                                h('tr', null,
+                                    h('th', { onClick: () => handleSort('id'), style: { minWidth: '50px' } }, 'ID ' + (sortKey === 'id' ? (sortAsc ? '↑' : '↓') : '')),
+                                    h('th', { onClick: () => handleSort('name'), style: { minWidth: '150px' } }, 'Name ' + (sortKey === 'name' ? (sortAsc ? '↑' : '↓') : '')),
+                                    h('th', { onClick: () => handleSort('mn'), style: { minWidth: '90px' } }, 'Month ' + (sortKey === 'mn' ? (sortAsc ? '↑' : '↓') : '')),
+                                    h('th', { onClick: () => handleSort('type'), style: { minWidth: '90px' } }, 'Type ' + (sortKey === 'type' ? (sortAsc ? '↑' : '↓') : '')),
+                                    h('th', { onClick: () => handleSort('rate'), style: { minWidth: '100px' } }, 'Rate ' + (sortKey === 'rate' ? (sortAsc ? '↑' : '↓') : '')),
+                                    h('th', { onClick: () => handleSort('hours'), style: { minWidth: '80px' } }, 'Hours ' + (sortKey === 'hours' ? (sortAsc ? '↑' : '↓') : '')),
+                                    h('th', { onClick: () => handleSort('amount'), style: { minWidth: '120px' } }, 'Amount ' + (sortKey === 'amount' ? (sortAsc ? '↑' : '↓') : '')),
+                                    h('th', { onClick: () => handleSort('status'), style: { minWidth: '100px' } }, 'Status ' + (sortKey === 'status' ? (sortAsc ? '↑' : '↓') : ''))
+                                )
+                            ),
+                            h('tbody', null,
+                                filteredEntries.map(e => h('tr', { key: e.id },
+                                    h('td', null, e.id),
+                                    h('td', null, e.name),
+                                    h('td', null, e.mn + ' ' + e.year),
+                                    h('td', null, e.type),
+                                    h('td', null, e.rate ? formatEGP(e.rate) : '—'),
+                                    h('td', null, e.hours ? e.hours.toFixed(2) : '—'),
+                                    h('td', null, formatEGP(e.amount)),
+                                    h('td', null,
+                                        h('span', {
+                                            className: e.status === 'Transferred' ? 'status-transferred px-3 py-1 rounded text-sm font-bold' : 'status-open px-3 py-1 rounded text-sm font-bold'
+                                        }, e.status)
+                                    )
+                                ))
+                            )
+                        )
+                    )
+                ),
+                h('div', { className: 'text-right text-slate-600' }, 'Showing ' + filteredEntries.length + ' of ' + entries.length + ' entries')
+            );
+        }
 
-  const handleChange = (field, value) => {
-    const updated = { ...formData, [field]: value };
+        // ============================================================
+        // TEAM TAB COMPONENT
+        // ============================================================
+        /**
+         * TeamTab - Team member directory with stats
+         * Displays all team members with their rates, tenure, and earned totals
+         */
+        function TeamTab() {
+            /**
+             * Calculate person statistics
+             * @param {string} name - Team member name
+             * @returns {object} Total hours and total earned
+             */
+            const getPersonStats = (name) => {
+                const personEntries = entries.filter(e => e.name === name);
+                const totalHours = personEntries.reduce((sum, e) => sum + (e.hours || 0), 0);
+                const totalEarned = personEntries.reduce((sum, e) => sum + e.amount, 0);
+                return { totalHours, totalEarned };
+            };
 
-    // Auto-calculate amount
-    if ((field === 'hours' || field === 'rate') && updated.rate && updated.hours) {
-      updated.amount = updated.hours * updated.rate;
-    }
+            return h('div', null,
+                h('h2', { className: 'text-2xl font-bold text-slate-900 mb-6' }, 'Team Members'),
+                h('div', { className: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' },
+                    team.map(member => {
+                        const stats = getPersonStats(member.name);
+                        return h('div', { key: member.name, className: 'bg-white rounded-lg shadow p-6' },
+                            h('div', { className: 'flex justify-between items-start mb-4' },
+                                h('div', null,
+                                    h('h3', { className: 'text-lg font-bold text-slate-900' }, member.name),
+                                    h('p', { className: 'text-sm text-slate-600 mt-1' }, member.type)
+                                ),
+                                h('span', { className: member.active ? 'badge-active' : 'badge-inactive' }, member.active ? 'Active' : 'Inactive')
+                            ),
+                            h('div', { className: 'space-y-2 mb-4' },
+                                h('p', { className: 'text-sm text-slate-600' }, h('span', { className: 'font-semibold' }, 'Type: '), member.type),
+                                member.rate && h('p', { className: 'text-sm text-slate-600' }, h('span', { className: 'font-semibold' }, 'Rate: '), formatEGP(member.rate) + '/hr'),
+                                member.salary && h('p', { className: 'text-sm text-slate-600' }, h('span', { className: 'font-semibold' }, 'Salary: '), formatEGP(member.salary) + '/mo'),
+                                h('p', { className: 'text-sm text-slate-600' }, h('span', { className: 'font-semibold' }, 'Tenure: '), member.start + (member.end ? ' to ' + member.end : ' - Present'))
+                            ),
+                            h('div', { className: 'border-t border-slate-200 pt-4' },
+                                h('p', { className: 'text-sm text-slate-600 mb-1' }, h('span', { className: 'font-semibold' }, 'Total Hours: '), stats.totalHours.toFixed(2)),
+                                h('p', { className: 'text-lg font-bold text-teal-600' }, formatEGP(stats.totalEarned))
+                            )
+                        );
+                    })
+                )
+            );
+        }
 
-    setFormData(updated);
-  };
+        // ============================================================
+        // SALARIES TAB COMPONENT
+        // ============================================================
+        /**
+         * SalariesTab - Salaried employee payment tracking
+         * Compares expected salary vs actual payments
+         */
+        function SalariesTab() {
+            const salariesData = [
+                { name: 'Amal Hamdy', salary: 6000 },
+                { name: 'Anas Emad', salary: 12000 },
+                { name: 'Bahaa Mohamed', salary: 30000 }
+            ];
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!formData.name) {
-      alert('Please enter a name');
-      return;
-    }
-    onAdd(formData);
-    setFormData({
-      year: 2026,
-      month: 2,
-      monthName: 'Feb',
-      name: '',
-      type: 'Hourly',
-      rate: 0,
-      hours: 0,
-      amount: 0,
-      status: 'Open',
-    });
-  };
+            const months = [
+                { name: 'Jan', year: 2026, month: 1 },
+                { name: 'Feb', year: 2026, month: 2 },
+            ];
 
-  const monthNames = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            /**
+             * Get monthly payments for an employee
+             * @param {string} name - Employee name
+             * @param {number} year - Year
+             * @param {number} month - Month
+             * @returns {number} Total payments received
+             */
+            const getMonthlyPaid = (name, year, month) => {
+                return entries
+                    .filter(e => e.name === name && e.year === year && e.month === month)
+                    .reduce((sum, e) => sum + e.amount, 0);
+            };
 
-  return (
-    <form onSubmit={handleSubmit}>
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Year</label>
-          <input
-            type="number"
-            value={formData.year}
-            onChange={(e) => handleChange('year', parseInt(e.target.value))}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Month</label>
-          <select
-            value={formData.month}
-            onChange={(e) => {
-              const m = parseInt(e.target.value);
-              handleChange('month', m);
-              handleChange('monthName', monthNames[m]);
-            }}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500"
-          >
-            {monthNames.map((name, idx) => idx > 0 && <option key={idx} value={idx}>{name}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Name</label>
-          <input
-            type="text"
-            value={formData.name}
-            onChange={(e) => handleChange('name', e.target.value)}
-            placeholder="Team member name"
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Type</label>
-          <select
-            value={formData.type}
-            onChange={(e) => handleChange('type', e.target.value)}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500"
-          >
-            <option>Hourly</option>
-            <option>Fulltime</option>
-            <option>Part-time + Hourly</option>
-          </select>
-        </div>
-      </div>
+            return h('div', null,
+                h('h2', { className: 'text-2xl font-bold text-slate-900 mb-6' }, 'Salaried Employees'),
+                h('div', { className: 'bg-white rounded-lg shadow overflow-x-auto' },
+                    h('table', null,
+                        h('thead', null,
+                            h('tr', null,
+                                h('th', null, 'Name'),
+                                h('th', null, 'Monthly Salary'),
+                                months.map(m => h('th', { key: m.name }, m.name + ' 26'))
+                            )
+                        ),
+                        h('tbody', null,
+                            salariesData.map(emp => h('tr', { key: emp.name },
+                                h('td', null, emp.name),
+                                h('td', null, formatEGP(emp.salary)),
+                                months.map(m => {
+                                    const paid = getMonthlyPaid(emp.name, m.year, m.month);
+                                    return h('td', { key: m.name },
+                                        h('div', null,
+                                            h('span', { className: paid >= emp.salary ? 'status-transferred px-2 py-1 rounded text-xs' : 'status-open px-2 py-1 rounded text-xs' }, formatEGP(paid)),
+                                            h('p', { className: 'text-xs text-slate-600 mt-1' }, 'vs ' + formatEGP(emp.salary))
+                                        )
+                                    );
+                                })
+                            ))
+                        )
+                    )
+                )
+            );
+        }
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Rate (EGP)</label>
-          <input
-            type="number"
-            value={formData.rate}
-            onChange={(e) => handleChange('rate', parseFloat(e.target.value) || 0)}
-            placeholder="0"
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Hours</label>
-          <input
-            type="number"
-            step="0.25"
-            value={formData.hours}
-            onChange={(e) => handleChange('hours', parseFloat(e.target.value) || 0)}
-            placeholder="0"
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Amount (Auto)</label>
-          <input
-            type="number"
-            value={formData.amount}
-            disabled
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-slate-100"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
-          <select
-            value={formData.status}
-            onChange={(e) => handleChange('status', e.target.value)}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500"
-          >
-            <option>Open</option>
-            <option>Transferred</option>
-          </select>
-        </div>
-      </div>
+        // ============================================================
+        // SCENARIOS TAB COMPONENT
+        // ============================================================
+        /**
+         * ScenariosTab - Interactive financial scenarios
+         * Allows adjustment of parameters to model different scenarios
+         * Calculates projected costs, revenue, and profit margins
+         */
+        function ScenariosTab() {
+            const [headcount, setHeadcount] = useState(11);
+            const [rateChange, setRateChange] = useState(0);
+            const [burnAdjust, setBurnAdjust] = useState(0);
 
-      <div className="flex gap-2">
-        <button
-          type="submit"
-          className="bg-teal-600 hover:bg-teal-700 text-white font-semibold px-4 py-2 rounded-lg transition"
-        >
-          Add Entry
-        </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="bg-slate-300 hover:bg-slate-400 text-slate-900 font-semibold px-4 py-2 rounded-lg transition"
-        >
-          Cancel
-        </button>
-      </div>
-    </form>
-  );
-}
+            // Calculate base monthly from February 2026 actuals
+            const currentMonthAmount = entries
+                .filter(e => e.year === 2026 && e.month === 2)
+                .reduce((sum, e) => sum + e.amount, 0);
 
+            const baseMonthly = currentMonthAmount;
+            const projectedMonthly = baseMonthly * (1 + rateChange / 100) * (1 + burnAdjust / 100);
+            const projectedAnnual = projectedMonthly * 12;
 
-    const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(React.createElement(RishcaBudgetDashboard));
-  </script>
+            // Financial metrics
+            const fy26Revenue = 49000;
+            const currentProfit = fy26Revenue - projectedAnnual;
+            const profitMargin = ((currentProfit / fy26Revenue) * 100).toFixed(1);
+
+            return h('div', null,
+                h('h2', { className: 'text-2xl font-bold text-slate-900 mb-6' }, 'Financial Scenarios'),
+                h('div', { className: 'grid grid-cols-1 lg:grid-cols-2 gap-6' },
+                    h('div', { className: 'bg-white rounded-lg shadow p-6' },
+                        h('h3', { className: 'text-lg font-bold mb-6' }, 'Adjust Parameters'),
+                        h('div', { className: 'space-y-6' },
+                            h('div', null,
+                                h('label', { className: 'block text-sm font-semibold mb-2' }, 'Headcount: ' + headcount),
+                                h('input', { type: 'range', min: '5', max: '20', value: headcount, onChange: (e) => setHeadcount(parseInt(e.target.value)), className: 'w-full' })
+                            ),
+                            h('div', null,
+                                h('label', { className: 'block text-sm font-semibold mb-2' }, 'Avg Rate Change: ' + rateChange + '%'),
+                                h('input', { type: 'range', min: '-50', max: '50', value: rateChange, onChange: (e) => setRateChange(parseInt(e.target.value)), className: 'w-full' })
+                            ),
+                            h('div', null,
+                                h('label', { className: 'block text-sm font-semibold mb-2' }, 'Monthly Burn Adjustment: ' + burnAdjust + '%'),
+                                h('input', { type: 'range', min: '-50', max: '50', value: burnAdjust, onChange: (e) => setBurnAdjust(parseInt(e.target.value)), className: 'w-full' })
+                            )
+                        )
+                    ),
+                    h('div', { className: 'space-y-4' },
+                        h('div', { className: 'kpi-card' },
+                            h('div', { className: 'text-sm text-slate-600 mb-1' }, 'Projected Monthly Cost'),
+                            h('div', { className: 'text-3xl font-bold text-slate-900' }, formatEGP(projectedMonthly))
+                        ),
+                        h('div', { className: 'kpi-card' },
+                            h('div', { className: 'text-sm text-slate-600 mb-1' }, 'Projected Annual Cost'),
+                            h('div', { className: 'text-3xl font-bold text-slate-900' }, formatEGP(projectedAnnual))
+                        ),
+                        h('div', { className: 'kpi-card' },
+                            h('div', { className: 'text-sm text-slate-600 mb-1' }, 'FY26 Revenue'),
+                            h('div', { className: 'text-3xl font-bold text-slate-900' }, formatEGP(fy26Revenue))
+                        ),
+                        h('div', { className: 'kpi-card ' + (currentProfit > 0 ? 'border-l-4 border-green-500' : 'border-l-4 border-red-500') },
+                            h('div', { className: 'text-sm text-slate-600 mb-1' }, 'Est. Annual Profit'),
+                            h('div', { className: 'text-3xl font-bold ' + (currentProfit > 0 ? 'text-green-600' : 'text-red-600') }, formatEGP(currentProfit)),
+                            h('div', { className: 'text-sm text-slate-600 mt-2' }, 'Margin: ' + profitMargin + '%')
+                        )
+                    )
+                )
+            );
+        }
+
+        // ============================================================
+        // MAIN APP COMPONENT
+        // ============================================================
+        /**
+         * App - Main application component
+         * Manages authentication state, tab navigation, and layout
+         * Includes header with Vitalis sync and logout buttons
+         */
+        function App() {
+            const [isLoggedIn, setIsLoggedIn] = useState(false);
+            const [activeTab, setActiveTab] = useState('dashboard');
+            const [syncStatus, setSyncStatus] = useState('');
+
+            if (!isLoggedIn) {
+                return h(LoginScreen, { onLogin: () => setIsLoggedIn(true) });
+            }
+
+            /**
+             * Handle Vitalis API data synchronization
+             * Sends sync request to backend
+             */
+            const handleSync = async () => {
+                setSyncStatus('Syncing...');
+                try {
+                    const response = await fetch(VITALIS_API, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${VITALIS_KEY}`
+                        },
+                        body: JSON.stringify({ action: 'sync' })
+                    });
+
+                    if (response.ok) {
+                        setSyncStatus('Data synced successfully');
+                        setTimeout(() => setSyncStatus(''), 3000);
+                    } else {
+                        setSyncStatus('Sync failed with status: ' + response.status);
+                    }
+                } catch (err) {
+                    setSyncStatus('Sync failed: ' + err.message);
+                }
+            };
+
+            return h('div', { className: 'min-h-screen bg-gray-50' },
+                h('div', { className: 'bg-slate-900 text-white shadow-lg' },
+                    h('div', { className: 'max-w-7xl mx-auto px-4 py-4' },
+                        h('div', { className: 'flex justify-between items-center mb-6' },
+                            h('h1', { className: 'text-2xl font-bold' }, 'RISHCA OS'),
+                            h('div', { className: 'flex gap-4' },
+                                h('button', { onClick: handleSync, className: 'bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg text-sm transition' }, 'Sync Vitalis'),
+                                h('button', { onClick: () => setIsLoggedIn(false), className: 'bg-slate-700 hover:bg-slate-600 text-white font-bold py-2 px-4 rounded-lg text-sm transition' }, 'Logout')
+                            )
+                        ),
+                        h('div', { className: 'flex gap-6 border-b border-slate-700 flex-wrap' },
+                            ['dashboard', 'time-log', 'team', 'salaries', 'scenarios'].map(tab => {
+                                const labels = { 'dashboard': 'Dashboard', 'time-log': 'Time Log', 'team': 'Team', 'salaries': 'Salaries', 'scenarios': 'Scenarios' };
+                                return h('button', { key: tab, onClick: () => setActiveTab(tab), className: 'py-3 px-4 font-semibold text-sm transition ' + (activeTab === tab ? 'border-b-3 border-teal-500 text-teal-400' : 'text-slate-300 hover:text-white') }, labels[tab]);
+                            })
+                        )
+                    )
+                ),
+                h('div', { className: 'max-w-7xl mx-auto px-4 py-8' },
+                    activeTab === 'dashboard' && h(DashboardTab),
+                    activeTab === 'time-log' && h(TimeLogTab),
+                    activeTab === 'team' && h(TeamTab),
+                    activeTab === 'salaries' && h(SalariesTab),
+                    activeTab === 'scenarios' && h(ScenariosTab)
+                )
+            );
+        }
+
+        // ============================================================
+        // APPLICATION INITIALIZATION
+        // ============================================================
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(h(App));
+
+        // ============================================================
+        // RISHCA OS BUDGET DASHBOARD - END OF APPLICATION
+        // ============================================================
+        // Features:
+        // - Password-protected access (rishca2026)
+        // - 5 functional tabs: Dashboard, Time Log, Team, Salaries, Scenarios
+        // - 70 embedded time entries with complete data
+        // - 11 team members with employment details
+        // - Interactive charts using Chart.js
+        // - Real-time filtering and sorting
+        // - Financial scenario modeling
+        // - Vitalis API integration for data sync
+        // - Professional dark theme with teal accents
+        // - Responsive design for mobile and desktop
+        // - Currency formatting for Egyptian Pounds (EGP)
+        //
+        // Browser Requirements:
+        // - Modern browser with ES6 support
+        // - JavaScript enabled
+        // - Works offline (no external data persistence)
+        //
+        // Data:
+        // - All 70 time entries embedded inline
+        // - Time range: March 2025 - February 2026
+        // - Team size: 11 members (hourly, part-time, full-time)
+        // - Monthly burn totals tracked
+        // - Salary expectations vs actual payments tracked
+        //
+        // Login Credentials:
+        // - Password: rishca2026
+        //
+        // Support:
+        // - Check browser console for debug information
+        // - Vitalis API endpoint: https://llrvrcgwhvcaqvscpnsi.supabase.co/functions/v1/team-time-log
+        // ============================================================
+    </script>
 </body>
 </html>
