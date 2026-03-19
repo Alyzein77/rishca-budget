@@ -333,6 +333,27 @@
         ];
 
         // ============================================================
+        // USD/EGP EXCHANGE RATES (monthly)
+        // ============================================================
+        const fxRates = {
+            "2025-01": 50.0, "2025-02": 50.0, "2025-03": 50.0,
+            "2025-04": 50.0, "2025-05": 50.0, "2025-06": 50.0,
+            "2025-07": 48.0, "2025-08": 47.0, "2025-09": 47.0,
+            "2025-10": 47.0, "2025-11": 50.0, "2025-12": 50.0,
+            "2026-01": 50.0, "2026-02": 50.0, "2026-03": 50.0,
+        };
+        function getFxRate(year, month) {
+            const key = year + '-' + String(month).padStart(2, '0');
+            return fxRates[key] || 50.0;
+        }
+        function egpToUsd(egp, year, month) {
+            return egp / getFxRate(year, month);
+        }
+        function formatUSD(value) {
+            return '$' + Math.round(value).toLocaleString('en-US');
+        }
+
+        // ============================================================
         // API CONFIGURATION
         // ============================================================
         const VITALIS_API = "https://llrvrcgwhvcaqvscpnsi.supabase.co/functions/v1/team-time-log";
@@ -416,11 +437,17 @@
             const activeMembers = team.filter(t => t.active).length;
 
             const monthlyTotals = {};
+            const monthlyTotalsUSD = {};
             entries.forEach(e => {
                 const key = `${e.year}-${String(e.month).padStart(2, '0')}`;
                 monthlyTotals[key] = (monthlyTotals[key] || 0) + e.amount;
+                monthlyTotalsUSD[key] = (monthlyTotalsUSD[key] || 0) + egpToUsd(e.amount, e.year, e.month);
             });
             const avgMonthlyBurn = Object.values(monthlyTotals).reduce((a, b) => a + b, 0) / Object.keys(monthlyTotals).length;
+            const thisMonthUSD = entries
+                .filter(e => e.year === currentYear && e.month === currentMonth)
+                .reduce((sum, e) => sum + egpToUsd(e.amount, e.year, e.month), 0);
+            const allTimeUSD = entries.reduce((sum, e) => sum + egpToUsd(e.amount, e.year, e.month), 0);
 
             useEffect(() => {
                 const ctxLine = document.getElementById('monthlyChart');
@@ -495,11 +522,13 @@
                 h('div', { className: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6' },
                     h('div', { className: 'kpi-card' },
                         h('div', { className: 'text-sm text-slate-600 mb-1' }, 'This Month'),
-                        h('div', { className: 'text-3xl font-bold text-slate-900' }, formatEGP(thisMonthAmount))
+                        h('div', { className: 'text-3xl font-bold text-slate-900' }, formatEGP(thisMonthAmount)),
+                        h('div', { className: 'text-sm text-teal-600 mt-1' }, formatUSD(thisMonthUSD))
                     ),
                     h('div', { className: 'kpi-card' },
                         h('div', { className: 'text-sm text-slate-600 mb-1' }, 'All Time'),
-                        h('div', { className: 'text-3xl font-bold text-slate-900' }, formatEGP(allTimeAmount))
+                        h('div', { className: 'text-3xl font-bold text-slate-900' }, formatEGP(allTimeAmount)),
+                        h('div', { className: 'text-sm text-teal-600 mt-1' }, formatUSD(allTimeUSD))
                     ),
                     h('div', { className: 'kpi-card' },
                         h('div', { className: 'text-sm text-slate-600 mb-1' }, 'Active Members'),
@@ -510,7 +539,7 @@
                         h('div', { className: 'text-3xl font-bold text-slate-900' }, formatEGP(avgMonthlyBurn))
                     )
                 ),
-                h('div', { className: 'grid grid-cols-1 lg:grid-cols-2 gap-6' },
+                h('div', { className: 'grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6' },
                     h('div', { className: 'chart-container' },
                         h('h3', { className: 'text-lg font-bold text-slate-900 mb-4' }, 'Monthly Spend Trend'),
                         h('canvas', { id: 'monthlyChart', height: '300' })
@@ -518,6 +547,52 @@
                     h('div', { className: 'chart-container' },
                         h('h3', { className: 'text-lg font-bold text-slate-900 mb-4' }, 'Top Earners'),
                         h('canvas', { id: 'personChart', height: '300' })
+                    )
+                ),
+                // Monthly FX Conversion Table
+                h('div', { className: 'chart-container' },
+                    h('h3', { className: 'text-lg font-bold text-slate-900 mb-4' }, 'Monthly Cost — EGP to USD Conversion'),
+                    h('div', { className: 'overflow-x-auto' },
+                        h('table', { className: 'w-full text-sm' },
+                            h('thead', null,
+                                h('tr', { className: 'bg-slate-800 text-white' },
+                                    h('th', { className: 'px-4 py-2 text-left' }, 'Month'),
+                                    h('th', { className: 'px-4 py-2 text-right' }, 'Total (EGP)'),
+                                    h('th', { className: 'px-4 py-2 text-right' }, 'FX Rate'),
+                                    h('th', { className: 'px-4 py-2 text-right' }, 'Total (USD)'),
+                                    h('th', { className: 'px-4 py-2 text-right' }, 'Cumulative (USD)')
+                                )
+                            ),
+                            h('tbody', null,
+                                (() => {
+                                    const months = Object.keys(monthlyTotals).sort();
+                                    let cumUSD = 0;
+                                    return months.map((key, i) => {
+                                        const [y, mo] = key.split('-');
+                                        const rate = getFxRate(parseInt(y), parseInt(mo));
+                                        const usd = monthlyTotalsUSD[key] || 0;
+                                        cumUSD += usd;
+                                        const label = new Date(parseInt(y), parseInt(mo) - 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+                                        return h('tr', { key: key, className: i % 2 === 0 ? 'bg-white' : 'bg-slate-50' },
+                                            h('td', { className: 'px-4 py-2 font-medium' }, label),
+                                            h('td', { className: 'px-4 py-2 text-right' }, formatEGP(monthlyTotals[key])),
+                                            h('td', { className: 'px-4 py-2 text-right text-slate-500' }, rate.toFixed(1)),
+                                            h('td', { className: 'px-4 py-2 text-right font-semibold text-teal-700' }, formatUSD(usd)),
+                                            h('td', { className: 'px-4 py-2 text-right font-semibold' }, formatUSD(cumUSD))
+                                        );
+                                    });
+                                })()
+                            ),
+                            h('tfoot', null,
+                                h('tr', { className: 'bg-slate-800 text-white font-bold' },
+                                    h('td', { className: 'px-4 py-2' }, 'TOTAL'),
+                                    h('td', { className: 'px-4 py-2 text-right' }, formatEGP(allTimeAmount)),
+                                    h('td', { className: 'px-4 py-2 text-right' }, '—'),
+                                    h('td', { className: 'px-4 py-2 text-right text-teal-300' }, formatUSD(allTimeUSD)),
+                                    h('td', null)
+                                )
+                            )
+                        )
                     )
                 )
             );
