@@ -110,9 +110,78 @@ var FX_API = "https://open.er-api.com/v6/latest/USD";
 
 function fmtEGP(v){return "EGP " + Math.round(v).toLocaleString();}
 function fmtUSD(v){return "$" + Math.round(v).toLocaleString();}
-function stLabel(s){return s==="T"?"Transferred":s==="O"?"Open":s;}
-function stColor(s){return s==="T"?"bg-green-100 text-green-800":"bg-yellow-100 text-yellow-800";}
+function stLabel(s){return s==="T"?"Transferred":s==="O"?"Open":s==="V"?"Vitalis":s;}
+function stColor(s){return s==="T"?"bg-green-100 text-green-800":s==="V"?"bg-blue-100 text-blue-800":"bg-yellow-100 text-yellow-800";}
 var MN=["","Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+// ── EGYPT PUBLIC HOLIDAYS (month-day) ─────────────────────────
+var EG_HOLIDAYS={
+  2025:["01-07","01-25","01-26","01-27","03-30","03-31","04-01","04-20","04-21","05-01","06-06","06-07","06-08","06-27","07-19","09-27","10-06","12-23"],
+  2026:["01-07","01-25","01-26","01-27","03-20","03-21","03-22","04-05","04-06","05-01","05-27","05-28","05-29","06-16","07-07","07-08","09-17","10-06","12-12"]
+};
+
+// Calculate working days in a given month/year (exclude weekends Fri+Sat and public holidays)
+function getWorkingDays(year,month){
+  var daysInMonth=new Date(year,month,0).getDate();
+  var holidays=EG_HOLIDAYS[year]||[];
+  var count=0;
+  for(var d=1;d<=daysInMonth;d++){
+    var date=new Date(year,month-1,d);
+    var dow=date.getDay(); // 0=Sun,1=Mon,...,5=Fri,6=Sat
+    if(dow===5||dow===6)continue; // Skip Friday & Saturday (Egypt weekend)
+    var mmdd=String(month).padStart(2,"0")+"-"+String(d).padStart(2,"0");
+    if(holidays.indexOf(mmdd)>=0)continue;
+    count++;
+  }
+  return count;
+}
+
+// Required hours for a month: working_days × 7 hrs/day
+function getRequiredHours(year,month,empType){
+  var wd=getWorkingDays(year,month);
+  if(empType==="Fulltime")return wd*7;
+  if(empType==="Part-time")return wd*3.5; // half day
+  return 0; // hourly workers have no required hours
+}
+
+// ── HOURLY RATE HISTORY (per person per month) ────────────────
+// Format: "Name|YYYY-MM" → rate. Falls back to team roster current rate.
+var rateHistory={
+  "Yasseen Nouh|2025-03":350,"Yasseen Nouh|2025-04":350,"Yasseen Nouh|2025-05":350,
+  "Yasseen Nouh|2025-06":350,"Yasseen Nouh|2025-07":350,"Yasseen Nouh|2025-08":350,
+  "Yasseen Nouh|2025-09":350,"Yasseen Nouh|2025-10":350,"Yasseen Nouh|2025-11":350,
+  "Yasseen Nouh|2025-12":350,"Yasseen Nouh|2026-01":350,"Yasseen Nouh|2026-02":900,
+  "Rana El Sobky|2025-03":150,"Rana El Sobky|2025-04":250,"Rana El Sobky|2025-05":250,
+  "Rana El Sobky|2025-06":250,"Rana El Sobky|2025-07":250,"Rana El Sobky|2025-08":250,
+  "Abaza|2025-03":250,"Abaza|2025-04":400,"Abaza|2025-05":400,"Abaza|2025-06":400,
+  "Anas Emad|2025-12":170,"Anas Emad|2026-01":170,"Anas Emad|2026-02":170
+};
+
+function getRate(name,year,month){
+  var key=name+"|"+year+"-"+String(month).padStart(2,"0");
+  if(rateHistory[key]!==undefined)return rateHistory[key];
+  var mem=team.find(function(t){return t.name===name;});
+  return mem?mem.rate:0;
+}
+
+// ── SALARY CALCULATION with deductions/overtime ───────────────
+function calcSalaryPay(name,year,month,hoursLogged,isException){
+  var mem=team.find(function(t){return t.name===name;});
+  if(!mem||!mem.salary)return {base:0,deduction:0,overtime:0,total:0,required:0,diff:0};
+  var required=getRequiredHours(year,month,mem.type);
+  var rate=getRate(name,year,month)||0;
+  // For salaried with no explicit hourly rate, derive from salary/required_hours
+  if(rate===0&&required>0)rate=mem.salary/required;
+  var diff=hoursLogged-required;
+  var deduction=0,overtime=0;
+  if(diff<0&&!isException){
+    deduction=Math.abs(diff)*rate; // missing hours × hourly rate
+  }else if(diff>0){
+    overtime=diff*rate; // extra hours × hourly rate
+  }
+  var total=mem.salary-deduction+overtime;
+  return {base:mem.salary,deduction:deduction,overtime:overtime,total:total,required:required,diff:diff,rate:rate};
+}
 
 // ── LOGIN ─────────────────────────────────────────────────────
 function Login(props){
@@ -298,100 +367,130 @@ function TeamTab(props){
 
 // ── PAYMENTS TAB (NEW) ────────────────────────────────────────
 function PayTab(props){
-  var data=props.data,setData=props.setData,fx=props.fx;
-  var curM=useState(2),curY=useState(2026);
+  var data=props.data,setData=props.setData,fx=props.fx,exc=props.exceptions;
+  var curM=useState(new Date().getMonth()+1),curY=useState(new Date().getFullYear());
+  var wd=getWorkingDays(curY[0],curM[0]);
 
-  // Get entries for selected month
-  var monthEntries=data.filter(function(e){return e.y===curY[0]&&e.m===curM[0];});
-
-  // Group by person
+  // Group entries by person for selected month
   var byPerson={};
-  monthEntries.forEach(function(e){
-    if(!byPerson[e.name])byPerson[e.name]={entries:[],total:0,allTransferred:true};
+  data.filter(function(e){return e.y===curY[0]&&e.m===curM[0];}).forEach(function(e){
+    if(!byPerson[e.name])byPerson[e.name]={entries:[],totalHrs:0,rawAmt:0,allTransferred:true};
     byPerson[e.name].entries.push(e);
-    byPerson[e.name].total+=e.amt;
-    if(e.st!=="T")byPerson[e.name].allTransferred=false;
+    byPerson[e.name].totalHrs+=e.hrs;
+    byPerson[e.name].rawAmt+=e.amt;
+    if(e.st!=="T"&&e.st!=="V")byPerson[e.name].allTransferred=false;
   });
 
-  // Add salaried employees who might not have entries
+  // Add salaried employees who might not have entries yet
   team.forEach(function(t){
-    if(t.salary>0 && !byPerson[t.name]){
-      // Check if they've started by this month
-      var startParts=t.start.split(" ");
-      var startM=MN.indexOf(startParts[0]);
-      var startY=parseInt(startParts[1]);
-      if(curY[0]>startY||(curY[0]===startY&&curM[0]>=startM)){
-        byPerson[t.name]={entries:[],total:t.salary,allTransferred:false,isSalaryOnly:true};
-      }
+    if(t.salary>0&&!byPerson[t.name]){
+      var sp=t.start.split(" ");var sM=MN.indexOf(sp[0]);var sY=parseInt(sp[1]);
+      if(curY[0]>sY||(curY[0]===sY&&curM[0]>=sM))
+        byPerson[t.name]={entries:[],totalHrs:0,rawAmt:0,allTransferred:false};
     }
   });
 
-  var grandTotal=Object.keys(byPerson).reduce(function(s,n){return s+byPerson[n].total;},0);
-  var pendingTotal=Object.keys(byPerson).reduce(function(s,n){return s+(byPerson[n].allTransferred?0:byPerson[n].total);},0);
+  // Calculate actual pay for each person
+  var payDetails={};
+  var grandTotal=0;
+  Object.keys(byPerson).forEach(function(name){
+    var p=byPerson[name];
+    var mem=team.find(function(t){return t.name===name;});
+    var excKey=name+"|"+curY[0]+"-"+String(curM[0]).padStart(2,"0");
+    var isExc=exc[0][excKey]||false;
 
-  function toggleStatus(personName){
-    setData(data.map(function(e){
-      if(e.name===personName&&e.y===curY[0]&&e.m===curM[0]){
-        return Object.assign({},e,{st:e.st==="T"?"O":"T"});
-      }
-      return e;
-    }));
-  }
+    if(mem&&mem.salary>0){
+      // Salaried: calculate with deductions/overtime
+      var calc=calcSalaryPay(name,curY[0],curM[0],p.totalHrs,isExc);
+      payDetails[name]={pay:calc.total,base:calc.base,deduction:calc.deduction,overtime:calc.overtime,
+        required:calc.required,diff:calc.diff,rate:calc.rate,isSalaried:true,isExc:isExc};
+      grandTotal+=calc.total;
+    }else{
+      // Hourly: just sum amounts
+      payDetails[name]={pay:p.rawAmt,isSalaried:false};
+      grandTotal+=p.rawAmt;
+    }
+  });
+
+  var pendingTotal=Object.keys(byPerson).reduce(function(s,n){return s+(byPerson[n].allTransferred?0:(payDetails[n]?payDetails[n].pay:0));},0);
 
   function markAllTransferred(personName){
-    setData(data.map(function(e){
-      if(e.name===personName&&e.y===curY[0]&&e.m===curM[0]){
-        return Object.assign({},e,{st:"T"});
-      }
+    setData(function(prev){return prev.map(function(e){
+      if(e.name===personName&&e.y===curY[0]&&e.m===curM[0])return Object.assign({},e,{st:"T"});
       return e;
-    }));
+    });});
   }
 
-  var months=[];
-  for(var mi=1;mi<=12;mi++)months.push(mi);
+  function toggleException(name){
+    var key=name+"|"+curY[0]+"-"+String(curM[0]).padStart(2,"0");
+    exc[1](function(prev){var n=Object.assign({},prev);n[key]=!n[key];return n;});
+  }
+
+  var monthOpts=[];for(var mi=1;mi<=12;mi++)monthOpts.push(mi);
 
   return h("div",{className:"fade-in"},
-    h("div",{className:"flex items-center gap-4 mb-6"},
+    h("div",{className:"flex flex-wrap items-center gap-4 mb-6"},
       h("select",{value:curM[0],onChange:function(e){curM[1](parseInt(e.target.value));},
         className:"border border-slate-300 rounded-lg px-4 py-2 font-medium"},
-        months.map(function(m){return h("option",{key:m,value:m},MN[m]);})),
+        monthOpts.map(function(m){return h("option",{key:m,value:m},MN[m]);})),
       h("select",{value:curY[0],onChange:function(e){curY[1](parseInt(e.target.value));},
         className:"border border-slate-300 rounded-lg px-4 py-2 font-medium"},
         h("option",{value:2025},"2025"),h("option",{value:2026},"2026")),
+      h("div",{className:"bg-slate-100 rounded-lg px-3 py-2 text-sm text-slate-600"},
+        wd+" working days · "+wd*7+"h FT · "+wd*3.5+"h PT"),
       h("div",{className:"ml-auto text-right"},
         h("div",{className:"text-sm text-slate-500"},"Total to Pay"),
         h("div",{className:"text-2xl font-bold text-slate-900"},fmtEGP(grandTotal)),
-        fx>0 && h("div",{className:"text-sm text-teal-600"},fmtUSD(grandTotal/fx))
+        fx>0&&h("div",{className:"text-sm text-teal-600"},fmtUSD(grandTotal/fx))
       )
     ),
-    pendingTotal>0 && h("div",{className:"bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-4"},
+    pendingTotal>0&&h("div",{className:"bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-4"},
       h("span",{className:"font-semibold text-yellow-800"},"Pending: "+fmtEGP(pendingTotal)),
-      fx>0 && h("span",{className:"text-yellow-600 ml-2"},"("+fmtUSD(pendingTotal/fx)+")")
+      fx>0&&h("span",{className:"text-yellow-600 ml-2"},"("+fmtUSD(pendingTotal/fx)+")")
     ),
     h("div",{className:"space-y-3"},
       Object.keys(byPerson).sort().map(function(name){
         var p=byPerson[name];
-        var member=team.find(function(t){return t.name===name;});
-        return h("div",{key:name,className:"bg-white rounded-xl shadow border border-slate-200 p-5 flex items-center justify-between"},
-          h("div",null,
-            h("div",{className:"font-bold text-lg text-slate-900"},name),
-            h("div",{className:"text-sm text-slate-500"},
-              member?member.type:"",
-              p.entries.length>0?" · "+p.entries.reduce(function(s,e){return s+e.hrs;},0).toFixed(1)+" hrs":"",
-              member&&member.rate>0?" @ "+fmtEGP(member.rate)+"/hr":""
+        var pd=payDetails[name];
+        var mem=team.find(function(t){return t.name===name;});
+
+        return h("div",{key:name,className:"bg-white rounded-xl shadow border border-slate-200 p-5"},
+          h("div",{className:"flex items-center justify-between"},
+            h("div",null,
+              h("div",{className:"font-bold text-lg text-slate-900"},name),
+              h("div",{className:"text-sm text-slate-500"},
+                mem?mem.type:"Hourly",
+                " · "+p.totalHrs.toFixed(1)+" hrs logged",
+                pd.isSalaried?" · "+pd.required+"h required":
+                  (mem&&mem.rate>0?" @ "+fmtEGP(getRate(name,curY[0],curM[0]))+"/hr":"")
+              )
+            ),
+            h("div",{className:"flex items-center gap-3"},
+              h("div",{className:"text-right"},
+                h("div",{className:"text-xl font-bold text-slate-900"},fmtEGP(pd.pay)),
+                fx>0&&h("div",{className:"text-sm text-teal-600"},fmtUSD(pd.pay/fx))
+              ),
+              h("button",{onClick:function(){markAllTransferred(name);},
+                className:p.allTransferred
+                  ?"bg-green-100 text-green-700 px-4 py-2 rounded-lg font-medium text-sm"
+                  :"bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg font-medium text-sm transition"},
+                p.allTransferred?"✓ Paid":"Mark Paid")
             )
           ),
-          h("div",{className:"flex items-center gap-4"},
-            h("div",{className:"text-right"},
-              h("div",{className:"text-xl font-bold text-slate-900"},fmtEGP(p.total)),
-              fx>0 && h("div",{className:"text-sm text-teal-600"},fmtUSD(p.total/fx))
-            ),
-            h("button",{onClick:function(){markAllTransferred(name);},
-              className:p.allTransferred
-                ?"bg-green-100 text-green-700 px-4 py-2 rounded-lg font-medium text-sm cursor-default"
-                :"bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg font-medium text-sm transition cursor-pointer"},
-              p.allTransferred?"✓ Paid":"Mark Paid"
-            )
+          // Salary breakdown for salaried employees
+          pd.isSalaried && h("div",{className:"mt-3 pt-3 border-t border-slate-100 flex flex-wrap items-center gap-4 text-sm"},
+            h("span",{className:"text-slate-500"},"Base: "+fmtEGP(pd.base)),
+            pd.diff<0&&!pd.isExc && h("span",{className:"text-red-600 font-semibold"},
+              "Deduction: -"+fmtEGP(pd.deduction)+" ("+Math.abs(pd.diff).toFixed(1)+"h short × "+fmtEGP(pd.rate)+"/hr)"),
+            pd.diff>0 && h("span",{className:"text-green-600 font-semibold"},
+              "Overtime: +"+fmtEGP(pd.overtime)+" ("+pd.diff.toFixed(1)+"h extra × "+fmtEGP(pd.rate)+"/hr)"),
+            pd.isExc && pd.diff<0 && h("span",{className:"text-amber-600 font-semibold"},"Exception: no deduction (manager override)"),
+            // Exception toggle
+            pd.diff<0 && h("button",{onClick:function(){toggleException(name);},
+              className:pd.isExc
+                ?"bg-amber-100 text-amber-700 px-3 py-1 rounded text-xs font-medium border border-amber-300"
+                :"bg-slate-100 text-slate-500 px-3 py-1 rounded text-xs font-medium border border-slate-200 hover:bg-amber-50"},
+              pd.isExc?"✓ Exception Active":"Grant Exception")
           )
         );
       })
@@ -446,6 +545,162 @@ function ScenTab(){
   );
 }
 
+// ── RATES TAB ─────────────────────────────────────────────────
+function RatesTab(props){
+  var rh=props.rateHistory,setRH=props.setRateHistory;
+  var months=["2025-03","2025-04","2025-05","2025-06","2025-07","2025-08","2025-09","2025-10","2025-11","2025-12","2026-01","2026-02","2026-03"];
+  var names=team.filter(function(t){return t.active||t.rate>0;}).map(function(t){return t.name;});
+
+  function updateRate(name,mKey,val){
+    var key=name+"|"+mKey;
+    var next=Object.assign({},rh);
+    next[key]=parseFloat(val)||0;
+    setRH(next);
+  }
+
+  return h("div",{className:"fade-in"},
+    h("h2",{className:"text-xl font-bold text-slate-900 mb-4"},"Hourly Rates by Month (EGP)"),
+    h("p",{className:"text-sm text-slate-500 mb-4"},"Edit any cell to update the rate for that person/month. Changes affect Payments calculations."),
+    h("div",{className:"bg-white rounded-xl shadow border border-slate-200 overflow-x-auto"},
+      h("table",{className:"w-full text-sm"},
+        h("thead",null,h("tr",{className:"bg-slate-50 border-b border-slate-200"},
+          h("th",{className:"px-3 py-2 text-left sticky left-0 bg-slate-50 z-10 min-w-[140px]"},"Name"),
+          months.map(function(m){
+            var parts=m.split("-");
+            return h("th",{key:m,className:"px-3 py-2 text-center min-w-[80px]"},MN[parseInt(parts[1])]+" "+parts[0].slice(2));
+          })
+        )),
+        h("tbody",null,names.map(function(name,ni){
+          var mem=team.find(function(t){return t.name===name;});
+          return h("tr",{key:name,className:ni%2===0?"bg-white":"bg-slate-50"},
+            h("td",{className:"px-3 py-2 font-medium sticky left-0 z-10 "+(ni%2===0?"bg-white":"bg-slate-50")},
+              name,
+              mem&&mem.salary>0 && h("span",{className:"text-xs text-teal-600 ml-1"},"("+mem.type+")")
+            ),
+            months.map(function(mKey){
+              var key=name+"|"+mKey;
+              var rate=rh[key]!==undefined?rh[key]:(mem?mem.rate:0);
+              return h("td",{key:mKey,className:"px-1 py-1 text-center"},
+                h("input",{type:"number",value:rate||"",
+                  onChange:function(e){updateRate(name,mKey,e.target.value);},
+                  className:"w-full text-center border border-slate-200 rounded px-1 py-1 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none",
+                  style:{color:rate>0?"#2563eb":"#94a3b8"}
+                })
+              );
+            })
+          );
+        }))
+      )
+    )
+  );
+}
+
+// ── WORKING HOURS TARGET TAB ──────────────────────────────────
+function HoursTab(props){
+  var data=props.data;
+  var months=["2025-03","2025-04","2025-05","2025-06","2025-07","2025-08","2025-09","2025-10","2025-11","2025-12","2026-01","2026-02","2026-03"];
+  // Only salaried employees have targets
+  var salaried=team.filter(function(t){return t.salary>0;});
+
+  return h("div",{className:"fade-in"},
+    h("h2",{className:"text-xl font-bold text-slate-900 mb-2"},"Working Hours Target vs Actual"),
+    h("p",{className:"text-sm text-slate-500 mb-4"},"Based on Egyptian working days (Sun-Thu), public holidays, and 7 hrs/day. Part-time = 3.5 hrs/day."),
+
+    // Working days summary
+    h("div",{className:"bg-white rounded-xl shadow border border-slate-200 p-5 mb-6"},
+      h("h3",{className:"font-bold text-slate-900 mb-3"},"Working Days per Month"),
+      h("div",{className:"flex flex-wrap gap-3"},
+        months.map(function(mKey){
+          var parts=mKey.split("-");
+          var y=parseInt(parts[0]),m=parseInt(parts[1]);
+          var wd=getWorkingDays(y,m);
+          return h("div",{key:mKey,className:"bg-slate-50 rounded-lg px-4 py-2 text-center border border-slate-200"},
+            h("div",{className:"text-xs text-slate-500"},MN[m]+" "+String(y).slice(2)),
+            h("div",{className:"text-lg font-bold text-slate-900"},wd),
+            h("div",{className:"text-xs text-slate-400"},wd*7+"h FT")
+          );
+        })
+      )
+    ),
+
+    // Per-person target vs actual
+    salaried.map(function(emp){
+      return h("div",{key:emp.name,className:"bg-white rounded-xl shadow border border-slate-200 mb-4 overflow-x-auto"},
+        h("div",{className:"px-5 pt-4 pb-2 border-b border-slate-100"},
+          h("span",{className:"font-bold text-lg text-slate-900"},emp.name),
+          h("span",{className:"ml-2 text-sm text-teal-600"},emp.type+" · "+fmtEGP(emp.salary)+"/mo")
+        ),
+        h("table",{className:"w-full text-sm"},
+          h("thead",null,h("tr",{className:"bg-slate-50"},
+            h("th",{className:"px-3 py-2 text-left"},""),
+            months.map(function(mKey){
+              var parts=mKey.split("-");
+              return h("th",{key:mKey,className:"px-3 py-2 text-center min-w-[85px]"},MN[parseInt(parts[1])]+" "+parts[0].slice(2));
+            })
+          )),
+          h("tbody",null,
+            // Required hours row
+            h("tr",{className:"border-b border-slate-100"},
+              h("td",{className:"px-3 py-2 font-medium text-slate-600"},"Required"),
+              months.map(function(mKey){
+                var parts=mKey.split("-");
+                var req=getRequiredHours(parseInt(parts[0]),parseInt(parts[1]),emp.type);
+                return h("td",{key:mKey,className:"px-3 py-2 text-center text-slate-500"},req+"h");
+              })
+            ),
+            // Actual hours row
+            h("tr",{className:"border-b border-slate-100"},
+              h("td",{className:"px-3 py-2 font-medium text-slate-600"},"Logged"),
+              months.map(function(mKey){
+                var parts=mKey.split("-");
+                var y=parseInt(parts[0]),m=parseInt(parts[1]);
+                var logged=data.filter(function(e){return e.name===emp.name&&e.y===y&&e.m===m;})
+                  .reduce(function(s,e){return s+e.hrs;},0);
+                var req=getRequiredHours(y,m,emp.type);
+                var color=logged>=req?"text-green-600":logged>0?"text-red-600":"text-slate-300";
+                return h("td",{key:mKey,className:"px-3 py-2 text-center font-semibold "+color},logged>0?logged.toFixed(1)+"h":"—");
+              })
+            ),
+            // Diff row
+            h("tr",{className:"border-b border-slate-100"},
+              h("td",{className:"px-3 py-2 font-medium text-slate-600"},"Diff"),
+              months.map(function(mKey){
+                var parts=mKey.split("-");
+                var y=parseInt(parts[0]),m=parseInt(parts[1]);
+                var logged=data.filter(function(e){return e.name===emp.name&&e.y===y&&e.m===m;})
+                  .reduce(function(s,e){return s+e.hrs;},0);
+                var req=getRequiredHours(y,m,emp.type);
+                if(logged===0)return h("td",{key:mKey,className:"px-3 py-2 text-center text-slate-300"},"—");
+                var diff=logged-req;
+                var color=diff>=0?"text-green-600":"text-red-600";
+                return h("td",{key:mKey,className:"px-3 py-2 text-center font-bold "+color},(diff>=0?"+":"")+diff.toFixed(1)+"h");
+              })
+            ),
+            // Pay impact row
+            h("tr",null,
+              h("td",{className:"px-3 py-2 font-medium text-slate-600"},"Pay"),
+              months.map(function(mKey){
+                var parts=mKey.split("-");
+                var y=parseInt(parts[0]),m=parseInt(parts[1]);
+                var logged=data.filter(function(e){return e.name===emp.name&&e.y===y&&e.m===m;})
+                  .reduce(function(s,e){return s+e.hrs;},0);
+                if(logged===0)return h("td",{key:mKey,className:"px-3 py-2 text-center text-slate-300"},"—");
+                var calc=calcSalaryPay(emp.name,y,m,logged,false);
+                var color=calc.deduction>0?"text-red-600":calc.overtime>0?"text-green-600":"text-slate-900";
+                return h("td",{key:mKey,className:"px-3 py-2 text-center text-xs "+color},
+                  h("div",{className:"font-bold"},fmtEGP(calc.total)),
+                  calc.deduction>0 && h("div",{className:"text-red-500"},"-"+fmtEGP(calc.deduction)),
+                  calc.overtime>0 && h("div",{className:"text-green-500"},"+"+fmtEGP(calc.overtime))
+                );
+              })
+            )
+          )
+        )
+      );
+    })
+  );
+}
+
 // ── MAIN APP ──────────────────────────────────────────────────
 function App(){
   var logged=useState(false);
@@ -454,6 +709,8 @@ function App(){
   var fx=useState(0);
   var fxLoading=useState(false);
   var syncMsg=useState("");
+  var rh=useState(Object.assign({},rateHistory)); // editable rate history
+  var exceptions=useState({}); // "Name|YYYY-MM" → true for manager exceptions
 
   // Fetch live FX rate on load
   useEffect(function(){
@@ -510,8 +767,8 @@ function App(){
 
   if(!logged[0])return h(Login,{onLogin:function(){logged[1](true);}});
 
-  var tabs=["dashboard","payments","time-log","team","scenarios"];
-  var tabLabels={"dashboard":"Dashboard","payments":"Payments","time-log":"Time Log","team":"Team","scenarios":"Scenarios"};
+  var tabs=["dashboard","payments","hours","rates","time-log","team","scenarios"];
+  var tabLabels={"dashboard":"Dashboard","payments":"Payments","hours":"Hours Target","rates":"Rates","time-log":"Time Log","team":"Team","scenarios":"Scenarios"};
 
   return h("div",{className:"min-h-screen"},
     // Header
@@ -546,7 +803,9 @@ function App(){
     // Content
     h("div",{className:"max-w-7xl mx-auto px-4 py-6"},
       tab[0]==="dashboard" && h(DashTab,{data:data[0],fx:fx[0]}),
-      tab[0]==="payments" && h(PayTab,{data:data[0],setData:data[1],fx:fx[0]}),
+      tab[0]==="payments" && h(PayTab,{data:data[0],setData:data[1],fx:fx[0],exceptions:exceptions}),
+      tab[0]==="hours" && h(HoursTab,{data:data[0]}),
+      tab[0]==="rates" && h(RatesTab,{rateHistory:rh[0],setRateHistory:rh[1]}),
       tab[0]==="time-log" && h(LogTab,{data:data[0],setData:data[1]}),
       tab[0]==="team" && h(TeamTab,{data:data[0]}),
       tab[0]==="scenarios" && h(ScenTab)
