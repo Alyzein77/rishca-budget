@@ -468,13 +468,24 @@ function App(){
     });
   },[]);
 
+  var syncing=useRef(false);
   function syncVitalis(){
+    if(syncing.current)return; // prevent double-click
+    syncing.current=true;
     syncMsg[1]("Syncing...");
     fetch(VITALIS+"?days=90",{headers:{"x-api-key":VITALIS_KEY}})
     .then(function(r){return r.json();})
     .then(function(j){
+      syncing.current=false;
       if(j.error){syncMsg[1]("Error: "+j.error);return;}
-      var newEntries=(j.entries||[]).map(function(e,i){
+      // Deduplicate by creating a unique key per entry (user+date+duration)
+      var seen={};
+      var newEntries=(j.entries||[]).filter(function(e){
+        var key=(e.user&&e.user.email||"")+"_"+e.logged_at+"_"+e.duration_minutes;
+        if(seen[key])return false;
+        seen[key]=true;
+        return true;
+      }).map(function(e,i){
         var d=new Date(e.logged_at||e.started_at);
         var hrs=Math.round(e.duration_minutes/60*100)/100;
         var nm=e.user&&e.user.name||e.user&&e.user.email||"Unknown";
@@ -484,12 +495,14 @@ function App(){
           name:nm,type:mem?mem.type[0]:"H",rate:rate,hrs:hrs,
           amt:mem&&mem.salary>0?mem.salary:rate*hrs,st:"V",src:"vitalis"};
       });
-      // Merge: keep manual, replace vitalis
-      var manual=data[0].filter(function(e){return !e.src;});
-      data[1](manual.concat(newEntries));
+      // Use functional setState to always get latest state — removes ALL old vitalis entries first
+      data[1](function(prev){
+        var manual=prev.filter(function(e){return e.src!=="vitalis";});
+        return manual.concat(newEntries);
+      });
       syncMsg[1](newEntries.length+" entries synced");
       setTimeout(function(){syncMsg[1]("");},5000);
-    }).catch(function(err){syncMsg[1]("Failed: "+err.message);});
+    }).catch(function(err){syncing.current=false;syncMsg[1]("Failed: "+err.message);});
   }
 
   if(!logged[0])return h(Login,{onLogin:function(){logged[1](true);}});
