@@ -490,7 +490,7 @@ function App(){
         var hrs=Math.round(e.duration_minutes/60*100)/100;
         var rawName=e.user&&e.user.name||e.user&&e.user.email||"Unknown";
         // Name normalization: map Vitalis names to budget system names
-        var nameMap={"Aml Hamdy":"Amal Hamdy","Aml":"Amal Hamdy","aml hamdy":"Amal Hamdy","Amal":"Amal Hamdy"};
+        var nameMap={"Aml Hamdy":"Amal Hamdy","Aml":"Amal Hamdy","aml hamdy":"Amal Hamdy","Amal":"Amal Hamdy","Bahaa Lashin":"Bahaa Mohamed","bahaa lashin":"Bahaa Mohamed","Bahaa":"Bahaa Mohamed"};
         var nm=nameMap[rawName]||rawName;
         var mem=team.find(function(t){return t.name===nm||t.name.toLowerCase()===nm.toLowerCase();});
         var rate=mem?mem.rate:0;
